@@ -163,7 +163,19 @@ function mesajFormat(m) {
 }
 
 function socketBul(kullaniciId) {
-    return Object.entries(aktifKullanicilar).find(([, v]) => v.kullanici.id === kullaniciId);
+    // ID string veya number olabilir, ikisini de kontrol et
+    const arananId = parseInt(kullaniciId);
+    return Object.entries(aktifKullanicilar).find(([, v]) => {
+        return v.kullanici.id === kullaniciId || 
+               v.kullanici.id === arananId || 
+               String(v.kullanici.id) === String(kullaniciId);
+    });
+}
+
+// Debug: aktif kullanicilari logla
+function aktifListeLogla(etiket) {
+    const liste = Object.values(aktifKullanicilar).map(v => ({ id: v.kullanici.id, ad: v.kullanici.ad, tip: typeof v.kullanici.id }));
+    console.log('[' + etiket + '] Aktif kullanicilar:', JSON.stringify(liste));
 }
 
 // ==================== SOCKET.IO ====================
@@ -369,8 +381,14 @@ io.on('connection', async (socket) => {
     // ======== WebRTC SİNYALLEŞME ========
 
     socket.on('arama-baslat', ({ hedefId, tip }) => {
+        console.log('[ARAMA] hedefId:', hedefId, 'tip:', typeof hedefId);
+        aktifListeLogla('ARAMA');
         const hs = socketBul(hedefId);
-        if (!hs) { socket.emit('arama-hata', 'Kullanıcı çevrimiçi değil!'); return; }
+        if (!hs) { 
+            console.log('[ARAMA] Kullanici bulunamadi! hedefId:', hedefId);
+            socket.emit('arama-hata', 'Kullanıcı çevrimiçi değil!'); 
+            return; 
+        }
         io.to(hs[0]).emit('gelen-arama', {
             arayanId: ben.id, arayanAd: ben.ad, arayanAvatar: ben.avatarUrl, tip
         });
