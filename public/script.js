@@ -11,14 +11,29 @@ let yaziyorKisiGenel = new Set();
 let yaziyorKisiOzel = null;
 let yaziyorTimer = null;
 let genelOkunmamis = 0;
-let dmOkunmamis = {};        // karsiId -> sayi
-let bekleyenFoto = null;     // { dataUrl, file }
+let dmOkunmamis = {};
+let bekleyenFoto = null;
 let _cachedGenelMesajlar = [];
-let _ayracEklendi = false;   // mevcut sohbette yeni mesaj ayracı eklendi mi
+let _ayracEklendi = false;
 let _sonGonderenId = null;
 let tema = localStorage.getItem('boom-tema') || 'karanlik';
 
+// ---- BAŞLANGIC ----
 document.documentElement.setAttribute('data-tema', tema);
+
+// iOS'ta klavye açıldığında viewport düzeltme
+if (/iPhone|iPad|iPod/.test(navigator.userAgent)) {
+    window.addEventListener('resize', () => {
+        const footer = document.getElementById('mesajFooter');
+        if (footer) footer.style.paddingBottom = '';
+    });
+}
+
+// Android keyboard için scroll düzeltme
+window.visualViewport && window.visualViewport.addEventListener('resize', () => {
+    const alan = document.getElementById('mesajAlani');
+    if (alan) setTimeout(() => { alan.scrollTop = alan.scrollHeight; }, 100);
+});
 
 // ---- TEMA ----
 function temaDegistir() {
@@ -26,6 +41,18 @@ function temaDegistir() {
     document.documentElement.setAttribute('data-tema', tema);
     localStorage.setItem('boom-tema', tema);
     toast(tema === 'karanlik' ? '🌙 Karanlık tema' : '☀️ Aydınlık tema');
+}
+
+// ---- SIDEBAR MOBİL ----
+function sidebarAc() {
+    document.getElementById('sidebar').classList.add('mobil-acik');
+    document.getElementById('sidebarOverlay').classList.add('aktif');
+    document.body.style.overflow = 'hidden';
+}
+function sidebarKapat() {
+    document.getElementById('sidebar').classList.remove('mobil-acik');
+    document.getElementById('sidebarOverlay').classList.remove('aktif');
+    document.body.style.overflow = '';
 }
 
 // ---- AVATAR ÖNİZLEME ----
@@ -59,7 +86,9 @@ function fotoyuIptalEt() {
 }
 
 // ---- GİRİŞ ----
-document.getElementById('kullaniciAdi').addEventListener('keydown', e => { if (e.key === 'Enter') girisYap(); });
+document.getElementById('kullaniciAdi').addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); girisYap(); }
+});
 
 async function girisYap() {
     const ad = document.getElementById('kullaniciAdi').value.trim();
@@ -74,9 +103,11 @@ async function girisYap() {
     const avatarInput = document.getElementById('avatarInput');
     if (avatarInput.files[0]) {
         try {
-            const fd = new FormData(); fd.append('avatar', avatarInput.files[0]);
+            const fd = new FormData();
+            fd.append('avatar', avatarInput.files[0]);
             const res = await fetch('/upload-avatar', { method: 'POST', body: fd });
-            avatarUrl = (await res.json()).url || null;
+            const veri = await res.json();
+            avatarUrl = veri.url || null;
         } catch (e) { console.warn('Avatar yüklenemedi'); }
     }
     socket.emit('yeni-kullanici', { ad, avatarUrl });
@@ -148,11 +179,8 @@ socket.on('genel-mesaj', (mesaj) => {
 
 socket.on('ozel-mesaj', (mesaj) => {
     const diger = mesaj.gonderenId === ben.id ? mesaj.aliciId : mesaj.gonderenId;
-
     if (aktifKullanici?.id === diger) {
-        // Aktif sohbetteyken
         if (mesaj.gonderenId !== ben.id) {
-            // Karşıdan geldi — "Yeni Mesaj" ayracı ekle (bir kez)
             if (!_ayracEklendi) {
                 yeniMesajAyraciEkle();
                 _ayracEklendi = true;
@@ -161,13 +189,12 @@ socket.on('ozel-mesaj', (mesaj) => {
         }
         ozelMesajRender(mesaj);
     } else if (mesaj.gonderenId !== ben.id) {
-        // Başka sohbetteyken — mavi badge + son mesaj önizlemesi
         dmOkunmamis[diger] = (dmOkunmamis[diger] || 0) + 1;
-        dmListesineEkle(kullanicilar[diger] || { id: diger, ad: mesaj.gonderenAd, avatarUrl: mesaj.gonderenAvatar });
+        const k = kullanicilar[diger] || { id: diger, ad: mesaj.gonderenAd, avatarUrl: mesaj.gonderenAvatar };
+        dmListesineEkle(k);
         dmBadgeGuncelle(diger);
         dmSonMesajGuncelle(diger, mesaj.foto ? '📷 Fotoğraf' : mesaj.metin);
-        const k = kullanicilar[diger];
-        toast('💬 ' + (k ? k.ad : mesaj.gonderenAd) + ': ' + (mesaj.foto ? '📷 Fotoğraf' : mesaj.metin.slice(0, 40)));
+        toast('💬 ' + k.ad + ': ' + (mesaj.foto ? '📷 Fotoğraf' : mesaj.metin.slice(0, 40)));
     }
 });
 
@@ -179,7 +206,6 @@ socket.on('ozel-gecmis', ({ karsiId, mesajlar }) => {
     _ayracEklendi = false;
     mesajlar.forEach(m => ozelMesajRender(m, false));
     kaydir();
-    // Okunmamış mesajları görüldü işaretle
     mesajlar.filter(m => m.gonderenId !== ben.id && !m.okundu).forEach(m => {
         socket.emit('mesaj-goruldu', { mesajId: m.id, gonderenId: m.gonderenId });
     });
@@ -219,13 +245,12 @@ socket.on('yazmayi-bitti-ozel', (id) => {
     yaziyorKisiOzel = null; yaziyorGuncelle();
 });
 
-// ---- RENDER YARDIMCILARI ----
-
+// ---- RENDER ----
 function hosgeldinHTML() {
     return `<div class="hosgeldin-mesaji">
         <div class="hosgeldin-ikon">💥</div>
         <h2>BOOM Chat'e Hoş Geldiniz!</h2>
-        <p>İlk mesajı göndererek konuşmayı başlatın.</p>
+        <p>İlk mesajı gönderin ve konuşmayı başlatın.</p>
     </div>`;
 }
 
@@ -249,7 +274,7 @@ function kullanicilariRender() {
     digerler.forEach(k => {
         const div = document.createElement('div');
         div.className = 'kullanici-item';
-        div.onclick = () => dmAc(k);
+        div.onclick = () => { dmAc(k); sidebarKapat(); };
         div.innerHTML = `
             <div class="kullanici-avatar">
                 ${k.avatarUrl ? `<img src="${k.avatarUrl}" style="width:100%;height:100%;object-fit:cover">` : k.ad[0].toUpperCase()}
@@ -260,47 +285,30 @@ function kullanicilariRender() {
     });
 }
 
-// Mavi badge güncelle
 function dmBadgeGuncelle(karsiId) {
-    const dmItem = document.querySelector(`[data-dm-id="${karsiId}"]`);
-    if (!dmItem) return;
+    const dmItem = document.querySelector(`[data-dm-id="${karsiId}"]`); if (!dmItem) return;
     let badge = dmItem.querySelector('.dm-badge');
     const sayi = dmOkunmamis[karsiId] || 0;
     if (sayi === 0) { badge?.remove(); return; }
-    if (!badge) {
-        badge = document.createElement('span');
-        badge.className = 'dm-badge';
-        dmItem.appendChild(badge);
-    }
+    if (!badge) { badge = document.createElement('span'); badge.className = 'dm-badge'; dmItem.appendChild(badge); }
     badge.textContent = sayi > 99 ? '99+' : sayi;
 }
 
-// Son mesaj önizlemesi
-function dmSonMesajGuncelle(karsiId, metinOnizleme) {
-    const dmItem = document.querySelector(`[data-dm-id="${karsiId}"]`);
-    if (!dmItem) return;
+function dmSonMesajGuncelle(karsiId, onizleme) {
+    const dmItem = document.querySelector(`[data-dm-id="${karsiId}"]`); if (!dmItem) return;
     let etiket = dmItem.querySelector('.yeni-mesaj-etiket');
-    if (!etiket) {
-        etiket = document.createElement('div');
-        etiket.className = 'yeni-mesaj-etiket var';
-        // DM item'in altına ekle (ayrı bir div içinde)
-        dmItem.style.flexWrap = 'wrap';
-        dmItem.appendChild(etiket);
-    }
-    etiket.textContent = metinOnizleme.slice(0, 30) + (metinOnizleme.length > 30 ? '...' : '');
-    etiket.className = 'yeni-mesaj-etiket var';
+    if (!etiket) { etiket = document.createElement('div'); etiket.className = 'yeni-mesaj-etiket var'; dmItem.appendChild(etiket); }
+    etiket.textContent = onizleme.slice(0, 28) + (onizleme.length > 28 ? '…' : '');
 }
 
-// Yeni mesaj kırmızı ayraç
 function yeniMesajAyraciEkle() {
     const alan = document.getElementById('mesajAlani');
-    // Zaten varsa tekrar ekleme
     if (alan.querySelector('.yeni-mesaj-ayrac')) return;
     const div = document.createElement('div');
     div.className = 'yeni-mesaj-ayrac';
     div.innerHTML = `<span class="yeni-mesaj-ayrac-yazi">YENİ MESAJLAR</span>`;
     alan.appendChild(div);
-    _sonGonderenId = null; // ayraçtan sonra yeni blok başlasın
+    _sonGonderenId = null;
 }
 
 // ---- KANAL SEÇ ----
@@ -323,6 +331,7 @@ function kanalSec(kanal) {
     _cachedGenelMesajlar.forEach(m => genelMesajRender(m, false));
     kaydir();
     inputAktifEt('# genel kanalına mesaj yaz...');
+    sidebarKapat();
 }
 
 // ---- DM AÇ ----
@@ -336,11 +345,9 @@ function dmAc(kullanici) {
     dmListesineEkle(kullanici);
     document.querySelector(`[data-dm-id="${kullanici.id}"]`)?.classList.add('aktif-dm');
 
-    // Badge ve önizleme temizle
     delete dmOkunmamis[kullanici.id];
     dmBadgeGuncelle(kullanici.id);
-    const etiket = document.querySelector(`[data-dm-id="${kullanici.id}"] .yeni-mesaj-etiket`);
-    if (etiket) etiket.remove();
+    document.querySelector(`[data-dm-id="${kullanici.id}"] .yeni-mesaj-etiket`)?.remove();
 
     document.getElementById('headerBaslik').innerHTML =
         `<span class="header-ikon" style="color:var(--mavi2)">@</span><span id="headerAd">${esc(kullanici.ad)}</span>`;
@@ -349,16 +356,17 @@ function dmAc(kullanici) {
     document.getElementById('mesajAlani').innerHTML = '';
     _sonGonderenId = null;
     socket.emit('gecmis-iste', kullanici.id);
-    inputAktifEt(`@${kullanici.ad} ile mesajlaş...`);
+    inputAktifEt('@' + kullanici.ad + ' ile mesajlaş...');
     sagPanelGuncelle();
+    sidebarKapat();
 }
 
 function dmListesineEkle(kullanici) {
-    const liste = document.getElementById('dmListesi');
     if (document.querySelector(`[data-dm-id="${kullanici.id}"]`)) return;
+    const liste = document.getElementById('dmListesi');
     const div = document.createElement('div');
     div.className = 'dm-item'; div.setAttribute('data-dm-id', kullanici.id);
-    div.onclick = () => dmAc(kullanici);
+    div.onclick = () => { dmAc(kullanici); sidebarKapat(); };
     div.innerHTML = `
         <div class="dm-avatar">
             ${kullanici.avatarUrl ? `<img src="${kullanici.avatarUrl}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">` : kullanici.ad[0].toUpperCase()}
@@ -371,8 +379,8 @@ function headerAksiyonlarGuncelle() {
     if (!aktifKullanici) { document.getElementById('headerAksiyonlar').innerHTML = ''; return; }
     const engellendi = engelliIdler.has(aktifKullanici.id);
     document.getElementById('headerAksiyonlar').innerHTML = engellendi
-        ? `<button class="aksiyon-btn" onclick="engelKaldir('${aktifKullanici.id}')">✅ Engeli Kaldır</button>`
-        : `<button class="aksiyon-btn tehlikeli" onclick="engelleModal('${aktifKullanici.id}')">🚫 Engelle</button>`;
+        ? `<button class="aksiyon-btn" onclick="engelKaldir('${aktifKullanici.id}')">✅ <span class="aksiyon-yazi">Engeli Kaldır</span></button>`
+        : `<button class="aksiyon-btn tehlikeli" onclick="engelleModal('${aktifKullanici.id}')">🚫 <span class="aksiyon-yazi">Engelle</span></button>`;
 }
 
 function sagPanelGuncelle() {
@@ -402,16 +410,19 @@ function inputAktifEt(placeholder) {
     const fotoBtn = document.getElementById('fotoEkleBtn');
     input.disabled = false; input.placeholder = placeholder;
     btn.disabled = false; fotoBtn.disabled = false;
-    setTimeout(() => input.focus(), 50);
+    // Mobilde otomatik focus açmasın (klavye açılır)
+    if (window.innerWidth > 768) setTimeout(() => input.focus(), 100);
 }
 
+// Enter ile gönder (Shift+Enter yeni satır)
 document.getElementById('mesajInput').addEventListener('keydown', e => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); mesajGonder(); }
 });
 
+// Textarea otomatik büyü
 document.getElementById('mesajInput').addEventListener('input', function () {
     this.style.height = 'auto';
-    this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+    this.style.height = Math.min(this.scrollHeight, 100) + 'px';
     clearTimeout(yaziyorTimer);
     const p = aktifKanal === 'genel' ? { tip: 'genel' } : { tip: 'ozel', aliciId: aktifKullanici?.id };
     socket.emit('yaziyor-basladi', p);
@@ -433,7 +444,7 @@ async function mesajGonder() {
         fotoyuIptalEt();
     }
 
-    const payload = { metin: metin, foto: fotoUrl };
+    const payload = { metin, foto: fotoUrl };
     if (aktifKanal === 'genel') {
         socket.emit('genel-mesaj', payload);
     } else if (aktifKullanici) {
@@ -445,14 +456,12 @@ async function mesajGonder() {
 }
 
 // ---- MESAJ RENDER ----
-
 function genelMesajRender(mesaj, kayirYap = true) {
     const alan = document.getElementById('mesajAlani');
     if (mesaj.tip === 'sistem') {
         const d = document.createElement('div'); d.className = 'sistem-mesaj';
         d.innerHTML = `<span>${esc(mesaj.metin)} — ${mesaj.zaman}</span>`;
-        alan.appendChild(d);
-        _sonGonderenId = null;
+        alan.appendChild(d); _sonGonderenId = null;
     } else {
         alan.appendChild(mesajWrap(mesaj));
     }
@@ -477,19 +486,15 @@ function mesajWrap(mesaj) {
     wrap.className = 'mesaj-wrap' + (benim ? ' kendi' : '') + (yeniBlok ? ' yeni-blok' : '');
     wrap.setAttribute('data-mesaj-id', mesaj.id);
 
-    const avatarHTML = (k.avatarUrl || k.avatar)
-        ? `<img src="${k.avatarUrl || k.avatar}" style="width:100%;height:100%;object-fit:cover">`
+    const avImg = k.avatarUrl || k.avatar;
+    const avatarHTML = avImg
+        ? `<img src="${avImg}" style="width:100%;height:100%;object-fit:cover">`
         : k.ad[0].toUpperCase();
 
-    // İçerik: fotoğraf veya metin
-    let balonIcerik = '';
-    if (mesaj.foto) {
-        balonIcerik = `<img src="${mesaj.foto}" class="mesaj-foto" onclick="lightboxAc('${mesaj.foto}')" alt="Fotoğraf">`;
-    } else {
-        balonIcerik = `<div class="mesaj-balon">${esc(mesaj.metin)}</div>`;
-    }
+    const balonIcerik = mesaj.foto
+        ? `<img src="${mesaj.foto}" class="mesaj-foto" onclick="lightboxAc('${mesaj.foto}')" alt="Fotoğraf">`
+        : `<div class="mesaj-balon">${esc(mesaj.metin)}</div>`;
 
-    // Okundu ikonu (sadece bizim mesajlarımızda)
     const okunduHTML = benim
         ? `<div class="mesaj-alt">
             <span class="mesaj-zaman-alt">${mesaj.zaman}</span>
@@ -516,7 +521,6 @@ function kaydir() {
     requestAnimationFrame(() => { alan.scrollTop = alan.scrollHeight; });
 }
 
-// ---- YAZIYOR ----
 function yaziyorGuncelle() {
     const el = document.getElementById('yaziyorAlan');
     if (aktifKanal === 'genel') {
@@ -528,30 +532,28 @@ function yaziyorGuncelle() {
     }
 }
 
-// ---- LIGHTBOX ----
+// ---- LİGHTBOX ----
 function lightboxAc(url) {
     document.getElementById('lightboxImg').src = url;
     document.getElementById('lightbox').classList.add('aktif');
 }
-function lightboxKapat() { document.getElementById('lightbox').classList.remove('aktif'); }
+function lightboxKapat() {
+    document.getElementById('lightbox').classList.remove('aktif');
+    document.getElementById('lightboxImg').src = '';
+}
 
 // ---- ENGELLEME ----
 function engelleModal(hedefId) {
     const k = kullanicilar[hedefId]; if (!k) return;
-    document.getElementById('engelModalIcerik').textContent = `"${k.ad}" adlı kullanıcıyı engellemek istediğinize emin misiniz?`;
+    document.getElementById('engelModalIcerik').textContent = '"' + k.ad + '" adlı kullanıcıyı engellemek istediğinize emin misiniz?';
     document.getElementById('engelOnayBtn').onclick = () => { socket.emit('engelle', hedefId); modalKapat('engelModal'); };
     document.getElementById('engelModal').style.display = 'flex';
 }
 function engelKaldir(hedefId) { socket.emit('engel-kaldir', hedefId); }
 function modalKapat(id) { document.getElementById(id).style.display = 'none'; }
 
-// ---- ÇIKIŞ / MOBİL ----
+// ---- ÇIKIŞ ----
 function cikisYap() { location.reload(); }
-function sidebarToggle() { document.getElementById('sidebar').classList.toggle('mobil-acik'); }
-document.getElementById('sohbetEkrani').addEventListener('click', e => {
-    const sb = document.getElementById('sidebar');
-    if (sb.classList.contains('mobil-acik') && !sb.contains(e.target)) sb.classList.remove('mobil-acik');
-});
 
 // ---- TOAST ----
 function toast(mesaj, tip = 'bilgi') {
