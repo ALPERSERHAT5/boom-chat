@@ -360,6 +360,46 @@ io.on('connection', async (socket) => {
         socket.emit('admin-ban-listesi', liste);
     });
 
+    // ======== WebRTC SİNYALLEŞME ========
+
+    socket.on('arama-baslat', ({ hedefId, tip }) => {
+        const hs = socketBul(hedefId);
+        if (!hs) { socket.emit('arama-hata', 'Kullanıcı çevrimiçi değil!'); return; }
+        io.to(hs[0]).emit('gelen-arama', {
+            arayanId: ben.id, arayanAd: ben.ad, arayanAvatar: ben.avatarUrl, tip
+        });
+    });
+
+    socket.on('arama-kabul', ({ arayanId }) => {
+        const hs = socketBul(arayanId);
+        if (hs) io.to(hs[0]).emit('arama-kabul-edildi', { kabulEdenId: ben.id });
+    });
+
+    socket.on('arama-reddet', ({ arayanId }) => {
+        const hs = socketBul(arayanId);
+        if (hs) io.to(hs[0]).emit('arama-reddedildi', { reddedenId: ben.id });
+    });
+
+    socket.on('arama-kapat', ({ hedefId }) => {
+        const hs = socketBul(hedefId);
+        if (hs) io.to(hs[0]).emit('arama-kapandi', { kapatanId: ben.id });
+    });
+
+    socket.on('webrtc-offer', ({ hedefId, offer }) => {
+        const hs = socketBul(hedefId);
+        if (hs) io.to(hs[0]).emit('webrtc-offer', { gonderenId: ben.id, offer });
+    });
+
+    socket.on('webrtc-answer', ({ hedefId, answer }) => {
+        const hs = socketBul(hedefId);
+        if (hs) io.to(hs[0]).emit('webrtc-answer', { gonderenId: ben.id, answer });
+    });
+
+    socket.on('ice-candidate', ({ hedefId, candidate }) => {
+        const hs = socketBul(hedefId);
+        if (hs) io.to(hs[0]).emit('ice-candidate', { gonderenId: ben.id, candidate });
+    });
+
     // ---- AYRILMA ----
     socket.on('disconnect', () => {
         const bilgi = aktifKullanicilar[socket.id];
