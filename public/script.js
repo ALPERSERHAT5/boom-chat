@@ -1,61 +1,53 @@
-// ==================== BOOM CHAT — script.js ====================
+// ==================== BOOM CHAT v3 — script.js ====================
 
-const socket = io();
-
+let socket = null;
 let ben = null;
-let aktifKanal = 'genel';
-let aktifKullanici = null;
-let kullanicilar = {};
+let aktifMod = 'oda';       // 'oda' veya 'dm'
+let aktifOda = null;        // oda adi
+let aktifKullanici = null;  // dm için
+let kullanicilar = {};      // id -> kullanici
+let odalar = [];            // oda listesi
 let engelliIdler = new Set();
-let yaziyorKisiGenel = new Set();
-let yaziyorKisiOzel = null;
+let yaziyorOda = new Set();
+let yaziyorOzel = null;
 let yaziyorTimer = null;
-let genelOkunmamis = 0;
 let dmOkunmamis = {};
+let odaOkunmamis = {};
 let bekleyenFoto = null;
-let _cachedGenelMesajlar = [];
+let _cachedOdaMesajlar = {}; // odaAdi -> mesajlar
 let _ayracEklendi = false;
 let _sonGonderenId = null;
 let tema = localStorage.getItem('boom-tema') || 'karanlik';
 
-// ---- BAŞLANGIC ----
 document.documentElement.setAttribute('data-tema', tema);
 
-// iOS'ta klavye açıldığında viewport düzeltme
-if (/iPhone|iPad|iPod/.test(navigator.userAgent)) {
-    window.addEventListener('resize', () => {
-        const footer = document.getElementById('mesajFooter');
-        if (footer) footer.style.paddingBottom = '';
-    });
+// ==================== AUTH ====================
+
+// Tab seç
+function tabSec(tab) {
+    document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('aktif'));
+    event.target.classList.add('aktif');
+    document.getElementById('girisForm').style.display = tab === 'giris' ? 'block' : 'none';
+    document.getElementById('kayitForm').style.display = tab === 'kayit' ? 'block' : 'none';
 }
 
-// Android keyboard için scroll düzeltme
-window.visualViewport && window.visualViewport.addEventListener('resize', () => {
-    const alan = document.getElementById('mesajAlani');
-    if (alan) setTimeout(() => { alan.scrollTop = alan.scrollHeight; }, 100);
+// Şifre göster/gizle
+function sifreGoster(inputId) {
+    const input = document.getElementById(inputId);
+    input.type = input.type === 'password' ? 'text' : 'password';
+}
+
+// Enter ile giriş/kayıt
+document.addEventListener('keydown', e => {
+    if (e.key !== 'Enter') return;
+    const girisEkrani = document.getElementById('girisEkrani');
+    if (!girisEkrani.classList.contains('aktif')) return;
+    const aktifTab = document.querySelector('.auth-tab.aktif')?.textContent;
+    if (aktifTab === 'Giriş Yap') girisYap();
+    else kayitOl();
 });
 
-// ---- TEMA ----
-function temaDegistir() {
-    tema = tema === 'karanlik' ? 'aydinlik' : 'karanlik';
-    document.documentElement.setAttribute('data-tema', tema);
-    localStorage.setItem('boom-tema', tema);
-    toast(tema === 'karanlik' ? '🌙 Karanlık tema' : '☀️ Aydınlık tema');
-}
-
-// ---- SIDEBAR MOBİL ----
-function sidebarAc() {
-    document.getElementById('sidebar').classList.add('mobil-acik');
-    document.getElementById('sidebarOverlay').classList.add('aktif');
-    document.body.style.overflow = 'hidden';
-}
-function sidebarKapat() {
-    document.getElementById('sidebar').classList.remove('mobil-acik');
-    document.getElementById('sidebarOverlay').classList.remove('aktif');
-    document.body.style.overflow = '';
-}
-
-// ---- AVATAR ÖNİZLEME ----
+// Avatar önizleme
 document.getElementById('avatarInput').addEventListener('change', function () {
     const dosya = this.files[0]; if (!dosya) return;
     const reader = new FileReader();
@@ -66,201 +58,335 @@ document.getElementById('avatarInput').addEventListener('change', function () {
     reader.readAsDataURL(dosya);
 });
 
-// ---- FOTOĞRAF SEÇ ----
-document.getElementById('fotoInput').addEventListener('change', function () {
-    const dosya = this.files[0]; if (!dosya) return;
-    const reader = new FileReader();
-    reader.onload = e => {
-        bekleyenFoto = { dataUrl: e.target.result, file: dosya };
-        document.getElementById('fotoOnizlemeImg').src = e.target.result;
-        document.getElementById('fotoOnizlemeAlan').style.display = 'block';
-    };
-    reader.readAsDataURL(dosya);
-    this.value = '';
-});
-
-function fotoyuIptalEt() {
-    bekleyenFoto = null;
-    document.getElementById('fotoOnizlemeAlan').style.display = 'none';
-    document.getElementById('fotoOnizlemeImg').src = '';
-}
-
-// ---- GİRİŞ ----
-document.getElementById('kullaniciAdi').addEventListener('keydown', e => {
-    if (e.key === 'Enter') { e.preventDefault(); girisYap(); }
-});
-
-async function girisYap() {
-    const ad = document.getElementById('kullaniciAdi').value.trim();
-    if (!ad) { hataGoster('Kullanıcı adı giriniz!'); return; }
-    if (ad.length < 2) { hataGoster('En az 2 karakter!'); return; }
-
-    const btn = document.getElementById('girisBtn');
-    btn.disabled = true;
-    btn.querySelector('.btn-yazi').textContent = 'BAĞLANIYOR...';
-
-    let avatarUrl = null;
-    const avatarInput = document.getElementById('avatarInput');
-    if (avatarInput.files[0]) {
+// Sayfa açılınca token kontrolü
+window.addEventListener('load', async () => {
+    const token = localStorage.getItem('boom-token');
+    if (token) {
         try {
-            const fd = new FormData();
-            fd.append('avatar', avatarInput.files[0]);
-            const res = await fetch('/upload-avatar', { method: 'POST', body: fd });
+            const res = await fetch('/api/token-dogrula', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ token })
+            });
             const veri = await res.json();
-            avatarUrl = veri.url || null;
-        } catch (e) { console.warn('Avatar yüklenemedi'); }
-    }
-    socket.emit('yeni-kullanici', { ad, avatarUrl });
-}
-
-function hataGoster(mesaj) {
-    document.getElementById('hataMesaji').textContent = mesaj;
-    setTimeout(() => { document.getElementById('hataMesaji').textContent = ''; }, 3000);
-    const btn = document.getElementById('girisBtn');
-    btn.disabled = false;
-    btn.querySelector('.btn-yazi').textContent = 'KATIL';
-}
-
-// ---- SOCKET OLAYLARI ----
-
-socket.on('isim-hatasi', hataGoster);
-
-socket.on('giris-basarili', (kullanici) => {
-    ben = kullanici;
-    document.getElementById('girisEkrani').classList.remove('aktif');
-    document.getElementById('sohbetEkrani').classList.add('aktif');
-    profilSidebarGuncelle();
-    inputAktifEt('# genel kanalına mesaj yaz...');
-    toast('👋 Hoş geldiniz, ' + ben.ad + '!');
-});
-
-socket.on('kullanici-listesi', (liste) => {
-    kullanicilar = {};
-    liste.forEach(k => kullanicilar[k.id] = k);
-    kullanicilariRender();
-    document.getElementById('kullaniciSayisi').textContent = liste.length;
-});
-
-socket.on('yeni-kullanici-katildi', (kullanici) => {
-    kullanicilar[kullanici.id] = kullanici;
-    kullanicilariRender();
-    document.getElementById('kullaniciSayisi').textContent = Object.keys(kullanicilar).length;
-});
-
-socket.on('kullanici-ayrildi', (id) => {
-    delete kullanicilar[id];
-    kullanicilariRender();
-    document.getElementById('kullaniciSayisi').textContent = Object.keys(kullanicilar).length;
-    document.querySelector(`[data-dm-id="${id}"]`)?.remove();
-    if (aktifKullanici?.id === id) kanalSec('genel');
-});
-
-socket.on('gecmis-mesajlar', (mesajlar) => {
-    _cachedGenelMesajlar = mesajlar;
-    if (aktifKanal !== 'genel') return;
-    const alan = document.getElementById('mesajAlani');
-    alan.innerHTML = hosgeldinHTML();
-    _sonGonderenId = null;
-    mesajlar.forEach(m => genelMesajRender(m, false));
-    kaydir();
-});
-
-socket.on('genel-mesaj', (mesaj) => {
-    if (mesaj.tip !== 'sistem') _cachedGenelMesajlar.push(mesaj);
-    if (aktifKanal === 'genel') {
-        genelMesajRender(mesaj);
-    } else if (mesaj.tip !== 'sistem') {
-        genelOkunmamis++;
-        const s = document.getElementById('genelSayac');
-        s.textContent = genelOkunmamis > 99 ? '99+' : genelOkunmamis;
-        s.style.display = 'flex';
+            if (veri.basarili) { socketBaglan(token, veri.kullanici); return; }
+        } catch (e) {}
+        localStorage.removeItem('boom-token');
     }
 });
 
-socket.on('ozel-mesaj', (mesaj) => {
-    const diger = mesaj.gonderenId === ben.id ? mesaj.aliciId : mesaj.gonderenId;
-    if (aktifKullanici?.id === diger) {
-        if (mesaj.gonderenId !== ben.id) {
-            if (!_ayracEklendi) {
-                yeniMesajAyraciEkle();
-                _ayracEklendi = true;
-            }
-            socket.emit('mesaj-goruldu', { mesajId: mesaj.id, gonderenId: mesaj.gonderenId });
+// Kayıt ol
+async function kayitOl() {
+    const ad = document.getElementById('kayitAdi').value.trim();
+    const sifre = document.getElementById('kayitSifre').value;
+    const adminKodu = document.getElementById('adminKodu').value.trim();
+    const btn = document.getElementById('kayitBtn');
+
+    if (!ad) { hataGoster('kayitHata', 'Kullanıcı adı giriniz!'); return; }
+    if (ad.length < 2) { hataGoster('kayitHata', 'En az 2 karakter!'); return; }
+    if (!sifre || sifre.length < 4) { hataGoster('kayitHata', 'Şifre en az 4 karakter!'); return; }
+
+    btn.disabled = true; btn.querySelector('.btn-yazi').textContent = 'KAYIT OLUYOR...';
+
+    const fd = new FormData();
+    fd.append('kullaniciAdi', ad);
+    fd.append('sifre', sifre);
+    if (adminKodu) fd.append('adminKodu', adminKodu);
+    const avatarInput = document.getElementById('avatarInput');
+    if (avatarInput.files[0]) fd.append('avatar', avatarInput.files[0]);
+
+    try {
+        const res = await fetch('/api/kayit', { method: 'POST', body: fd });
+        const veri = await res.json();
+        if (!veri.basarili) {
+            hataGoster('kayitHata', veri.hata);
+            btn.disabled = false; btn.querySelector('.btn-yazi').textContent = 'KAYIT OL';
+            return;
         }
-        ozelMesajRender(mesaj);
-    } else if (mesaj.gonderenId !== ben.id) {
-        dmOkunmamis[diger] = (dmOkunmamis[diger] || 0) + 1;
-        const k = kullanicilar[diger] || { id: diger, ad: mesaj.gonderenAd, avatarUrl: mesaj.gonderenAvatar };
-        dmListesineEkle(k);
-        dmBadgeGuncelle(diger);
-        dmSonMesajGuncelle(diger, mesaj.foto ? '📷 Fotoğraf' : mesaj.metin);
-        toast('💬 ' + k.ad + ': ' + (mesaj.foto ? '📷 Fotoğraf' : mesaj.metin.slice(0, 40)));
+        localStorage.setItem('boom-token', veri.token);
+        socketBaglan(veri.token, veri.kullanici);
+    } catch (e) {
+        hataGoster('kayitHata', 'Bağlantı hatası!');
+        btn.disabled = false; btn.querySelector('.btn-yazi').textContent = 'KAYIT OL';
     }
-});
+}
 
-socket.on('ozel-gecmis', ({ karsiId, mesajlar }) => {
-    if (aktifKullanici?.id !== karsiId) return;
-    const alan = document.getElementById('mesajAlani');
-    alan.innerHTML = '';
-    _sonGonderenId = null;
-    _ayracEklendi = false;
-    mesajlar.forEach(m => ozelMesajRender(m, false));
-    kaydir();
-    mesajlar.filter(m => m.gonderenId !== ben.id && !m.okundu).forEach(m => {
-        socket.emit('mesaj-goruldu', { mesajId: m.id, gonderenId: m.gonderenId });
+// Giriş yap
+async function girisYap() {
+    const ad = document.getElementById('girisAdi').value.trim();
+    const sifre = document.getElementById('girisSifre').value;
+    const btn = document.getElementById('girisBtn');
+
+    if (!ad || !sifre) { hataGoster('girisHata', 'Tüm alanları doldurun!'); return; }
+
+    btn.disabled = true; btn.querySelector('.btn-yazi').textContent = 'GİRİYOR...';
+
+    try {
+        const res = await fetch('/api/giris', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ kullaniciAdi: ad, sifre })
+        });
+        const veri = await res.json();
+        if (!veri.basarili) {
+            hataGoster('girisHata', veri.hata);
+            btn.disabled = false; btn.querySelector('.btn-yazi').textContent = 'GİRİŞ YAP';
+            return;
+        }
+        localStorage.setItem('boom-token', veri.token);
+        socketBaglan(veri.token, veri.kullanici);
+    } catch (e) {
+        hataGoster('girisHata', 'Bağlantı hatası!');
+        btn.disabled = false; btn.querySelector('.btn-yazi').textContent = 'GİRİŞ YAP';
+    }
+}
+
+function hataGoster(elId, mesaj) {
+    document.getElementById(elId).textContent = mesaj;
+    setTimeout(() => { document.getElementById(elId).textContent = ''; }, 4000);
+}
+
+function cikisYap() {
+    localStorage.removeItem('boom-token');
+    socket?.disconnect();
+    location.reload();
+}
+
+// ==================== SOCKET BAĞLAN ====================
+
+function socketBaglan(token, kullanici) {
+    ben = kullanici;
+
+    socket = io({ auth: { token } });
+
+    // Bağlantı hatası
+    socket.on('connect_error', (err) => {
+        if (err.message.startsWith('BANLANDI:')) {
+            const sebep = err.message.replace('BANLANDI:', '');
+            alert('Hesabınız banlandı!\nSebep: ' + sebep);
+            localStorage.removeItem('boom-token');
+        } else {
+            hataGoster('girisHata', 'Bağlantı hatası: ' + err.message);
+            const btn = document.getElementById('girisBtn');
+            if (btn) { btn.disabled = false; btn.querySelector('.btn-yazi').textContent = 'GİRİŞ YAP'; }
+        }
     });
-});
 
-socket.on('mesaj-goruldu-bildir', ({ mesajId }) => {
-    const el = document.querySelector(`[data-mesaj-id="${mesajId}"] .okundu-ikon`);
-    if (el) { el.textContent = '✓✓'; el.classList.add('goruldu'); }
-});
+    socket.on('connect', () => {
+        // Giriş ekranından çık
+        document.getElementById('girisEkrani').classList.remove('aktif');
+        document.getElementById('sohbetEkrani').classList.add('aktif');
 
-socket.on('engel-basarili', (id) => {
-    engelliIdler.add(id);
-    toast('🚫 Kullanıcı engellendi');
-    headerAksiyonlarGuncelle(); sagPanelGuncelle();
-});
-socket.on('engel-kaldirildi', (id) => {
-    engelliIdler.delete(id);
-    toast('✅ Engel kaldırıldı');
-    headerAksiyonlarGuncelle(); sagPanelGuncelle();
-});
-socket.on('engel-uyarisi', (m) => toast('⛔ ' + m, 'hata'));
+        profilSidebarGuncelle();
+        if (ben.rol === 'admin') document.body.classList.add('admin');
 
-socket.on('yaziyor-genel', ({ id, ad }) => {
-    if (aktifKanal !== 'genel') return;
-    yaziyorKisiGenel.add(id + '|' + ad); yaziyorGuncelle();
-});
-socket.on('yazmayi-bitti-genel', (id) => {
-    yaziyorKisiGenel.forEach(v => { if (v.startsWith(id + '|')) yaziyorKisiGenel.delete(v); });
-    yaziyorGuncelle();
-});
-socket.on('yaziyor-ozel', ({ id, ad }) => {
-    if (!aktifKullanici || aktifKullanici.id !== id) return;
-    yaziyorKisiOzel = ad; yaziyorGuncelle();
-});
-socket.on('yazmayi-bitti-ozel', (id) => {
-    if (!aktifKullanici || aktifKullanici.id !== id) return;
-    yaziyorKisiOzel = null; yaziyorGuncelle();
-});
+        // Kullanıcı listesini iste
+        socket.emit('kullanici-listesi-iste');
 
-// ---- RENDER ----
+        toast('👋 Hoş geldiniz, ' + ben.ad + (ben.rol === 'admin' ? ' ⚡' : '') + '!');
+    });
+
+    socketOlaylariKur();
+}
+
+// ==================== SOCKET OLAYLARI ====================
+
+function socketOlaylariKur() {
+
+    socket.on('odalar-listesi', (liste) => {
+        odalar = liste;
+        odalariRender();
+        // İlk odaya gir
+        if (liste.length > 0 && !aktifOda) {
+            odaGir(liste[0].ad);
+        }
+    });
+
+    socket.on('yeni-oda', (oda) => {
+        odalar.push(oda);
+        odalariRender();
+        toast('🆕 Yeni oda: #' + oda.ad);
+    });
+
+    socket.on('oda-silindi', (odaId) => {
+        odalar = odalar.filter(o => o.id !== odaId);
+        odalariRender();
+        if (aktifOda && aktifOda === odalar.find(o => o.id === odaId)?.ad) {
+            odaGir(odalar[0]?.ad);
+        }
+    });
+
+    socket.on('kullanici-listesi', (liste) => {
+        kullanicilar = {};
+        liste.forEach(k => kullanicilar[k.id] = k);
+        kullanicilariRender();
+        document.getElementById('kullaniciSayisi').textContent = liste.length;
+    });
+
+    socket.on('kullanici-katildi-oda', ({ kullanici, odaAdi }) => {
+        kullanicilar[kullanici.id] = kullanici;
+        kullanicilariRender();
+        document.getElementById('kullaniciSayisi').textContent = Object.keys(kullanicilar).length;
+    });
+
+    socket.on('kullanici-ayrildi-oda', ({ kullaniciId }) => {
+        // Sadece o odadan ayrıldı, kullanicilar listesinden silme
+    });
+
+    socket.on('kullanici-ayrildi-genel', (id) => {
+        delete kullanicilar[id];
+        kullanicilariRender();
+        document.getElementById('kullaniciSayisi').textContent = Object.keys(kullanicilar).length;
+        document.querySelector(`[data-dm-id="${id}"]`)?.remove();
+        if (aktifKullanici?.id === id) { aktifKullanici = null; odaGir(aktifOda); }
+    });
+
+    socket.on('oda-gecmis', ({ odaAdi, mesajlar }) => {
+        _cachedOdaMesajlar[odaAdi] = mesajlar;
+        if (aktifMod === 'oda' && aktifOda === odaAdi) {
+            const alan = document.getElementById('mesajAlani');
+            alan.innerHTML = hosgeldinHTML();
+            _sonGonderenId = null;
+            mesajlar.forEach(m => mesajRender(m, false, 'oda'));
+            kaydir();
+        }
+    });
+
+    socket.on('oda-mesaj', ({ odaAdi, mesaj }) => {
+        if (aktifMod === 'oda' && aktifOda === odaAdi) {
+            if (!_cachedOdaMesajlar[odaAdi]) _cachedOdaMesajlar[odaAdi] = [];
+            _cachedOdaMesajlar[odaAdi].push(mesaj);
+            mesajRender(mesaj, true, 'oda');
+        } else if (mesaj.gonderenId !== ben.id) {
+            odaOkunmamis[odaAdi] = (odaOkunmamis[odaAdi] || 0) + 1;
+            odaBadgeGuncelle(odaAdi);
+            toast('💬 #' + odaAdi + ' → ' + (mesaj.foto ? '📷' : mesaj.metin?.slice(0, 30)));
+        }
+    });
+
+    socket.on('oda-temizlendi', (odaAdi) => {
+        _cachedOdaMesajlar[odaAdi] = [];
+        if (aktifMod === 'oda' && aktifOda === odaAdi) {
+            document.getElementById('mesajAlani').innerHTML = hosgeldinHTML();
+            _sonGonderenId = null;
+        }
+    });
+
+    socket.on('ozel-mesaj', (mesaj) => {
+        const diger = mesaj.gonderenId === ben.id ? mesaj.aliciId : mesaj.gonderenId;
+        if (aktifMod === 'dm' && aktifKullanici?.id === diger) {
+            if (mesaj.gonderenId !== ben.id) {
+                if (!_ayracEklendi) { yeniMesajAyraciEkle(); _ayracEklendi = true; }
+                socket.emit('mesaj-goruldu', { mesajId: mesaj.id, gonderenId: mesaj.gonderenId });
+            }
+            mesajRender(mesaj, true, 'dm');
+        } else if (mesaj.gonderenId !== ben.id) {
+            dmOkunmamis[diger] = (dmOkunmamis[diger] || 0) + 1;
+            const k = kullanicilar[diger] || { id: diger, ad: mesaj.gonderenAd, avatarUrl: mesaj.gonderenAvatar };
+            dmListesineEkle(k);
+            dmBadgeGuncelle(diger);
+            dmSonMesajGuncelle(diger, mesaj.foto ? '📷 Fotoğraf' : mesaj.metin);
+            toast('💬 ' + k.ad + ': ' + (mesaj.foto ? '📷 Fotoğraf' : mesaj.metin?.slice(0, 35)));
+        }
+    });
+
+    socket.on('ozel-gecmis', ({ karsiId, mesajlar }) => {
+        if (aktifKullanici?.id !== karsiId) return;
+        const alan = document.getElementById('mesajAlani');
+        alan.innerHTML = ''; _sonGonderenId = null; _ayracEklendi = false;
+        mesajlar.forEach(m => mesajRender(m, false, 'dm'));
+        kaydir();
+        mesajlar.filter(m => m.gonderenId !== ben.id && !m.okundu).forEach(m => {
+            socket.emit('mesaj-goruldu', { mesajId: m.id, gonderenId: m.gonderenId });
+        });
+    });
+
+    socket.on('mesaj-goruldu-bildir', ({ mesajId }) => {
+        const el = document.querySelector(`[data-mesaj-id="${mesajId}"] .okundu-ikon`);
+        if (el) { el.textContent = '✓✓'; el.classList.add('goruldu'); }
+    });
+
+    socket.on('engel-basarili',   (id) => { engelliIdler.add(id);    toast('🚫 Engellendi');     headerAksiyonlarGuncelle(); sagPanelGuncelle(); });
+    socket.on('engel-kaldirildi', (id) => { engelliIdler.delete(id); toast('✅ Engel kaldırıldı'); headerAksiyonlarGuncelle(); sagPanelGuncelle(); });
+    socket.on('engel-uyarisi', (m) => toast('⛔ ' + m, 'hata'));
+
+    socket.on('yaziyor-oda', ({ id, ad, odaAdi }) => {
+        if (aktifMod !== 'oda' || aktifOda !== odaAdi) return;
+        yaziyorOda.add(id + '|' + ad); yaziyorGuncelle();
+    });
+    socket.on('yazmayi-bitti-oda', ({ id }) => {
+        yaziyorOda.forEach(v => { if (v.startsWith(id + '|')) yaziyorOda.delete(v); });
+        yaziyorGuncelle();
+    });
+    socket.on('yaziyor-ozel', ({ id, ad }) => {
+        if (!aktifKullanici || aktifKullanici.id !== id) return;
+        yaziyorOzel = ad; yaziyorGuncelle();
+    });
+    socket.on('yazmayi-bitti-ozel', (id) => {
+        if (!aktifKullanici || aktifKullanici.id !== id) return;
+        yaziyorOzel = null; yaziyorGuncelle();
+    });
+
+    // Admin olayları
+    socket.on('admin-islem-tamam', (mesaj) => toast('✅ ' + mesaj));
+    socket.on('admin-hata', (mesaj) => toast('❌ ' + mesaj, 'hata'));
+    socket.on('admin-ban-listesi', (liste) => adminBanListesiGoster(liste));
+    socket.on('ban-yendi', ({ sebep }) => {
+        alert('Hesabınız banlandı!\nSebep: ' + (sebep || 'Belirtilmedi'));
+        cikisYap();
+    });
+    socket.on('sistem-bildirim', ({ metin }) => toast('📢 ' + metin));
+
+    // Fotoğraf inputu
+    document.getElementById('fotoInput').addEventListener('change', function () {
+        const dosya = this.files[0]; if (!dosya) return;
+        const reader = new FileReader();
+        reader.onload = e => {
+            bekleyenFoto = { dataUrl: e.target.result, file: dosya };
+            document.getElementById('fotoOnizlemeImg').src = e.target.result;
+            document.getElementById('fotoOnizlemeAlan').style.display = 'block';
+        };
+        reader.readAsDataURL(dosya);
+        this.value = '';
+    });
+}
+
+// ==================== RENDER ====================
+
 function hosgeldinHTML() {
     return `<div class="hosgeldin-mesaji">
         <div class="hosgeldin-ikon">💥</div>
         <h2>BOOM Chat'e Hoş Geldiniz!</h2>
-        <p>İlk mesajı gönderin ve konuşmayı başlatın.</p>
+        <p>Mesaj göndererek konuşmayı başlatın.</p>
     </div>`;
 }
 
 function profilSidebarGuncelle() {
-    if (!ben) return;
     document.getElementById('sidebarAd').textContent = ben.ad;
+    const rolEl = document.getElementById('profilRol');
+    rolEl.textContent = ben.rol === 'admin' ? '⚡ Admin' : 'Üye';
+    if (ben.rol === 'admin') rolEl.classList.add('admin');
     const av = document.getElementById('sidebarAvatar');
     av.innerHTML = ben.avatarUrl
         ? `<img src="${ben.avatarUrl}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`
         : ben.ad[0].toUpperCase();
+}
+
+function odalariRender() {
+    const liste = document.getElementById('odaListesi');
+    liste.innerHTML = '';
+    odalar.forEach(oda => {
+        const div = document.createElement('div');
+        div.className = 'oda-item' + (aktifOda === oda.ad && aktifMod === 'oda' ? ' aktif-oda' : '');
+        div.setAttribute('data-oda', oda.ad);
+        div.onclick = () => { odaGir(oda.ad); sidebarKapat(); };
+        div.innerHTML = `
+            <span class="kanal-ikon">#</span>
+            <span style="flex:1">${esc(oda.ad)}</span>
+            <span class="mesaj-sayaci oda-sayac" id="oda-sayac-${oda.ad}" style="display:none"></span>
+            ${ben?.rol === 'admin' && oda.ad !== 'genel'
+                ? `<button class="oda-sil-btn admin-only" onclick="event.stopPropagation();odaSil(${oda.id})">✕</button>`
+                : ''}`;
+        liste.appendChild(div);
+    });
 }
 
 function kullanicilariRender() {
@@ -280,9 +406,18 @@ function kullanicilariRender() {
                 ${k.avatarUrl ? `<img src="${k.avatarUrl}" style="width:100%;height:100%;object-fit:cover">` : k.ad[0].toUpperCase()}
                 <div class="online-badge"></div>
             </div>
-            <span class="kullanici-ad-metin">${esc(k.ad)}</span>`;
+            <span class="kullanici-ad-metin">${esc(k.ad)}</span>
+            ${k.rol === 'admin' ? '<span class="admin-badge">ADMİN</span>' : ''}`;
         liste.appendChild(div);
     });
+}
+
+function odaBadgeGuncelle(odaAdi) {
+    const el = document.getElementById('oda-sayac-' + odaAdi); if (!el) return;
+    const sayi = odaOkunmamis[odaAdi] || 0;
+    if (sayi === 0) { el.style.display = 'none'; return; }
+    el.textContent = sayi > 99 ? '99+' : sayi;
+    el.style.display = 'flex';
 }
 
 function dmBadgeGuncelle(karsiId) {
@@ -296,9 +431,9 @@ function dmBadgeGuncelle(karsiId) {
 
 function dmSonMesajGuncelle(karsiId, onizleme) {
     const dmItem = document.querySelector(`[data-dm-id="${karsiId}"]`); if (!dmItem) return;
-    let etiket = dmItem.querySelector('.yeni-mesaj-etiket');
-    if (!etiket) { etiket = document.createElement('div'); etiket.className = 'yeni-mesaj-etiket var'; dmItem.appendChild(etiket); }
-    etiket.textContent = onizleme.slice(0, 28) + (onizleme.length > 28 ? '…' : '');
+    let el = dmItem.querySelector('.yeni-mesaj-etiket');
+    if (!el) { el = document.createElement('div'); el.className = 'yeni-mesaj-etiket var'; dmItem.appendChild(el); }
+    el.textContent = onizleme?.slice(0, 28) + (onizleme?.length > 28 ? '…' : '');
 }
 
 function yeniMesajAyraciEkle() {
@@ -307,39 +442,46 @@ function yeniMesajAyraciEkle() {
     const div = document.createElement('div');
     div.className = 'yeni-mesaj-ayrac';
     div.innerHTML = `<span class="yeni-mesaj-ayrac-yazi">YENİ MESAJLAR</span>`;
-    alan.appendChild(div);
-    _sonGonderenId = null;
+    alan.appendChild(div); _sonGonderenId = null;
 }
 
-// ---- KANAL SEÇ ----
-function kanalSec(kanal) {
-    aktifKanal = kanal; aktifKullanici = null;
-    yaziyorKisiOzel = null; _ayracEklendi = false;
-    document.querySelectorAll('.kanal-item').forEach(e => e.classList.remove('aktif-kanal'));
-    document.querySelectorAll('.dm-item').forEach(e => e.classList.remove('aktif-dm'));
-    document.getElementById('genelKanal').classList.add('aktif-kanal');
-    document.getElementById('headerBaslik').innerHTML = '<span class="header-ikon">#</span><span id="headerAd">genel</span>';
-    document.getElementById('headerAksiyonlar').innerHTML = '';
-    sagPanelGizle();
+// ==================== ODA / DM SEÇİM ====================
 
-    genelOkunmamis = 0;
-    const s = document.getElementById('genelSayac'); s.textContent = ''; s.style.display = 'none';
+function odaGir(odaAdi) {
+    if (!odaAdi) return;
+    aktifMod = 'oda'; aktifOda = odaAdi; aktifKullanici = null;
+    yaziyorOda.clear(); yaziyorOzel = null; _ayracEklendi = false;
+
+    document.querySelectorAll('.oda-item').forEach(e => e.classList.remove('aktif-oda'));
+    document.querySelectorAll('.dm-item').forEach(e => e.classList.remove('aktif-dm'));
+    document.querySelector(`[data-oda="${odaAdi}"]`)?.classList.add('aktif-oda');
+
+    delete odaOkunmamis[odaAdi];
+    odaBadgeGuncelle(odaAdi);
+
+    document.getElementById('headerBaslik').innerHTML =
+        `<span class="header-ikon">#</span><span id="headerAd">${esc(odaAdi)}</span>`;
+    adminHeaderGuncelle();
 
     const alan = document.getElementById('mesajAlani');
-    alan.innerHTML = hosgeldinHTML();
-    _sonGonderenId = null;
-    _cachedGenelMesajlar.forEach(m => genelMesajRender(m, false));
-    kaydir();
-    inputAktifEt('# genel kanalına mesaj yaz...');
-    sidebarKapat();
+    alan.innerHTML = hosgeldinHTML(); _sonGonderenId = null;
+
+    // Cache varsa göster, yoksa sunucudan iste
+    if (_cachedOdaMesajlar[odaAdi]) {
+        _cachedOdaMesajlar[odaAdi].forEach(m => mesajRender(m, false, 'oda'));
+        kaydir();
+    }
+
+    socket.emit('oda-gir', odaAdi);
+    inputAktifEt('# ' + odaAdi + ' kanalına mesaj yaz...');
+    sagPanelGizle();
 }
 
-// ---- DM AÇ ----
 function dmAc(kullanici) {
-    aktifKullanici = kullanici; aktifKanal = kullanici.id;
-    yaziyorKisiGenel.clear(); _ayracEklendi = false;
+    aktifMod = 'dm'; aktifKullanici = kullanici;
+    yaziyorOda.clear(); _ayracEklendi = false;
 
-    document.querySelectorAll('.kanal-item').forEach(e => e.classList.remove('aktif-kanal'));
+    document.querySelectorAll('.oda-item').forEach(e => e.classList.remove('aktif-oda'));
     document.querySelectorAll('.dm-item').forEach(e => e.classList.remove('aktif-dm'));
 
     dmListesineEkle(kullanici);
@@ -353,12 +495,10 @@ function dmAc(kullanici) {
         `<span class="header-ikon" style="color:var(--mavi2)">@</span><span id="headerAd">${esc(kullanici.ad)}</span>`;
     headerAksiyonlarGuncelle();
 
-    document.getElementById('mesajAlani').innerHTML = '';
-    _sonGonderenId = null;
+    document.getElementById('mesajAlani').innerHTML = ''; _sonGonderenId = null;
     socket.emit('gecmis-iste', kullanici.id);
     inputAktifEt('@' + kullanici.ad + ' ile mesajlaş...');
     sagPanelGuncelle();
-    sidebarKapat();
 }
 
 function dmListesineEkle(kullanici) {
@@ -375,12 +515,24 @@ function dmListesineEkle(kullanici) {
     liste.appendChild(div);
 }
 
+function adminHeaderGuncelle() {
+    const aksiyonlar = document.getElementById('headerAksiyonlar');
+    if (ben?.rol !== 'admin') { aksiyonlar.innerHTML = ''; return; }
+    aksiyonlar.innerHTML = `
+        <button class="aksiyon-btn mavi" onclick="adminPanelAc()">⚡ <span class="aksiyon-yazi">Admin</span></button>
+        <button class="aksiyon-btn tehlikeli" onclick="odaTemizle()">🗑 <span class="aksiyon-yazi">Temizle</span></button>`;
+}
+
 function headerAksiyonlarGuncelle() {
     if (!aktifKullanici) { document.getElementById('headerAksiyonlar').innerHTML = ''; return; }
     const engellendi = engelliIdler.has(aktifKullanici.id);
-    document.getElementById('headerAksiyonlar').innerHTML = engellendi
+    let html = engellendi
         ? `<button class="aksiyon-btn" onclick="engelKaldir('${aktifKullanici.id}')">✅ <span class="aksiyon-yazi">Engeli Kaldır</span></button>`
         : `<button class="aksiyon-btn tehlikeli" onclick="engelleModal('${aktifKullanici.id}')">🚫 <span class="aksiyon-yazi">Engelle</span></button>`;
+    if (ben?.rol === 'admin') {
+        html += `<button class="aksiyon-btn ban" onclick="banModalAc('${aktifKullanici.id}')">⛔ <span class="aksiyon-yazi">Banla</span></button>`;
+    }
+    document.getElementById('headerAksiyonlar').innerHTML = html;
 }
 
 function sagPanelGuncelle() {
@@ -399,32 +551,33 @@ function sagPanelGuncelle() {
             ${engellendi
                 ? `<button class="aksiyon-btn" onclick="engelKaldir('${k.id}')">✅ Engeli Kaldır</button>`
                 : `<button class="aksiyon-btn tehlikeli" onclick="engelleModal('${k.id}')">🚫 Engelle</button>`}
+            ${ben?.rol === 'admin' ? `<button class="aksiyon-btn ban" onclick="banModalAc('${k.id}')">⛔ Banla</button>` : ''}
         </div>`;
 }
 function sagPanelGizle() { document.getElementById('sagPanel').style.display = 'none'; }
 
-// ---- MESAJ GÖNDER ----
+// ==================== MESAJ GÖNDER ====================
+
 function inputAktifEt(placeholder) {
     const input = document.getElementById('mesajInput');
     const btn = document.getElementById('gonderBtn');
     const fotoBtn = document.getElementById('fotoEkleBtn');
     input.disabled = false; input.placeholder = placeholder;
     btn.disabled = false; fotoBtn.disabled = false;
-    // Mobilde otomatik focus açmasın (klavye açılır)
     if (window.innerWidth > 768) setTimeout(() => input.focus(), 100);
 }
 
-// Enter ile gönder (Shift+Enter yeni satır)
 document.getElementById('mesajInput').addEventListener('keydown', e => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); mesajGonder(); }
 });
 
-// Textarea otomatik büyü
 document.getElementById('mesajInput').addEventListener('input', function () {
     this.style.height = 'auto';
     this.style.height = Math.min(this.scrollHeight, 100) + 'px';
     clearTimeout(yaziyorTimer);
-    const p = aktifKanal === 'genel' ? { tip: 'genel' } : { tip: 'ozel', aliciId: aktifKullanici?.id };
+    const p = aktifMod === 'oda'
+        ? { tip: 'oda', odaAdi: aktifOda }
+        : { tip: 'dm', aliciId: aktifKullanici?.id };
     socket.emit('yaziyor-basladi', p);
     yaziyorTimer = setTimeout(() => socket.emit('yaziyor-bitti', p), 2500);
 });
@@ -438,25 +591,31 @@ async function mesajGonder() {
     if (bekleyenFoto) {
         try {
             const fd = new FormData(); fd.append('foto', bekleyenFoto.file);
-            const res = await fetch('/upload-foto', { method: 'POST', body: fd });
+            const res = await fetch('/api/foto', { method: 'POST', body: fd });
             fotoUrl = (await res.json()).url || null;
         } catch (e) { toast('Fotoğraf yüklenemedi!', 'hata'); return; }
         fotoyuIptalEt();
     }
 
-    const payload = { metin, foto: fotoUrl };
-    if (aktifKanal === 'genel') {
-        socket.emit('genel-mesaj', payload);
+    if (aktifMod === 'oda') {
+        socket.emit('oda-mesaj', { odaAdi: aktifOda, metin, foto: fotoUrl });
     } else if (aktifKullanici) {
-        socket.emit('ozel-mesaj', { aliciId: aktifKullanici.id, ...payload });
+        socket.emit('ozel-mesaj', { aliciId: aktifKullanici.id, metin, foto: fotoUrl });
     }
     input.value = ''; input.style.height = 'auto';
-    const p = aktifKanal === 'genel' ? { tip: 'genel' } : { tip: 'ozel', aliciId: aktifKullanici?.id };
+    const p = aktifMod === 'oda' ? { tip: 'oda', odaAdi: aktifOda } : { tip: 'dm', aliciId: aktifKullanici?.id };
     socket.emit('yaziyor-bitti', p);
 }
 
-// ---- MESAJ RENDER ----
-function genelMesajRender(mesaj, kayirYap = true) {
+function fotoyuIptalEt() {
+    bekleyenFoto = null;
+    document.getElementById('fotoOnizlemeAlan').style.display = 'none';
+    document.getElementById('fotoOnizlemeImg').src = '';
+}
+
+// ==================== MESAJ RENDER ====================
+
+function mesajRender(mesaj, kayirYap = true, mod = 'oda') {
     const alan = document.getElementById('mesajAlani');
     if (mesaj.tip === 'sistem') {
         const d = document.createElement('div'); d.className = 'sistem-mesaj';
@@ -468,16 +627,11 @@ function genelMesajRender(mesaj, kayirYap = true) {
     if (kayirYap) kaydir();
 }
 
-function ozelMesajRender(mesaj, kayirYap = true) {
-    document.getElementById('mesajAlani').appendChild(mesajWrap(mesaj));
-    if (kayirYap) kaydir();
-}
-
 function mesajWrap(mesaj) {
     const benim = mesaj.gonderenId === ben?.id;
     const k = benim
-        ? ben
-        : (kullanicilar[mesaj.gonderenId] || { ad: mesaj.gonderenAd, avatarUrl: mesaj.gonderenAvatar });
+        ? { ...ben, ad: ben.ad, avatarUrl: ben.avatarUrl }
+        : (kullanicilar[mesaj.gonderenId] || { id: mesaj.gonderenId, ad: mesaj.gonderenAd, avatarUrl: mesaj.gonderenAvatar });
 
     const yeniBlok = _sonGonderenId !== mesaj.gonderenId;
     _sonGonderenId = mesaj.gonderenId;
@@ -489,26 +643,21 @@ function mesajWrap(mesaj) {
     const avImg = k.avatarUrl || k.avatar;
     const avatarHTML = avImg
         ? `<img src="${avImg}" style="width:100%;height:100%;object-fit:cover">`
-        : k.ad[0].toUpperCase();
+        : (k.ad || '?')[0].toUpperCase();
 
     const balonIcerik = mesaj.foto
         ? `<img src="${mesaj.foto}" class="mesaj-foto" onclick="lightboxAc('${mesaj.foto}')" alt="Fotoğraf">`
         : `<div class="mesaj-balon">${esc(mesaj.metin)}</div>`;
 
     const okunduHTML = benim
-        ? `<div class="mesaj-alt">
-            <span class="mesaj-zaman-alt">${mesaj.zaman}</span>
-            <span class="okundu-ikon${mesaj.okundu ? ' goruldu' : ''}">${mesaj.okundu ? '✓✓' : '✓'}</span>
-           </div>`
+        ? `<div class="mesaj-alt"><span class="mesaj-zaman-alt">${mesaj.zaman}</span><span class="okundu-ikon${mesaj.okundu ? ' goruldu' : ''}">${mesaj.okundu ? '✓✓' : '✓'}</span></div>`
         : `<div class="mesaj-alt"><span class="mesaj-zaman-alt">${mesaj.zaman}</span></div>`;
 
     wrap.innerHTML = `
         <div class="mesaj-row">
             <div class="mesaj-avatar ${yeniBlok ? '' : 'gizli'}">${avatarHTML}</div>
             <div class="mesaj-icerik">
-                ${yeniBlok && !benim
-                    ? `<div class="mesaj-meta"><span class="mesaj-yazar">${esc(k.ad)}</span><span class="mesaj-zaman-meta">${mesaj.zaman}</span></div>`
-                    : ''}
+                ${yeniBlok && !benim ? `<div class="mesaj-meta"><span class="mesaj-yazar">${esc(k.ad)}</span><span class="mesaj-zaman-meta">${mesaj.zaman}</span></div>` : ''}
                 ${balonIcerik}
                 ${okunduHTML}
             </div>
@@ -523,16 +672,104 @@ function kaydir() {
 
 function yaziyorGuncelle() {
     const el = document.getElementById('yaziyorAlan');
-    if (aktifKanal === 'genel') {
-        if (yaziyorKisiGenel.size === 0) { el.textContent = ''; return; }
-        const adlar = [...yaziyorKisiGenel].map(v => v.split('|')[1]);
-        el.textContent = adlar.join(', ') + ' yazıyor...';
+    if (aktifMod === 'oda') {
+        if (yaziyorOda.size === 0) { el.textContent = ''; return; }
+        el.textContent = [...yaziyorOda].map(v => v.split('|')[1]).join(', ') + ' yazıyor...';
     } else {
-        el.textContent = yaziyorKisiOzel ? yaziyorKisiOzel + ' yazıyor...' : '';
+        el.textContent = yaziyorOzel ? yaziyorOzel + ' yazıyor...' : '';
     }
 }
 
-// ---- LİGHTBOX ----
+// ==================== ADMİN ====================
+
+function adminPanelAc() {
+    const cevrImici = Object.values(kullanicilar).filter(k => k.id !== ben.id);
+    let html = `<div class="admin-bolum">
+        <div class="admin-bolum-baslik">ÇEVRİMİÇİ KULLANICILAR</div>`;
+
+    if (cevrImici.length === 0) {
+        html += '<p style="font-size:12px;color:var(--t3)">Başka kullanıcı yok</p>';
+    } else {
+        cevrImici.forEach(k => {
+            html += `<div class="admin-kullanici-satir">
+                <span class="admin-kullanici-ad">${esc(k.ad)}${k.rol === 'admin' ? ' <span class="admin-badge">ADMİN</span>' : ''}</span>
+                <button class="admin-btn ban" onclick="banModalAc('${k.id}');modalKapat('adminModal')">⛔ Banla</button>
+            </div>`;
+        });
+    }
+
+    html += `</div>
+    <div class="admin-bolum">
+        <div class="admin-bolum-baslik">BAN LİSTESİ</div>
+        <button class="admin-btn mavi" onclick="socket.emit('admin-ban-listesi-iste')">Listeyi Yükle</button>
+        <div id="adminBanListesi" style="margin-top:8px"></div>
+    </div>`;
+
+    document.getElementById('adminPanelIcerik').innerHTML = html;
+    document.getElementById('adminModal').style.display = 'flex';
+}
+
+function adminBanListesiGoster(liste) {
+    const el = document.getElementById('adminBanListesi'); if (!el) return;
+    if (liste.length === 0) { el.innerHTML = '<p style="font-size:12px;color:var(--t3)">Ban yok</p>'; return; }
+    el.innerHTML = liste.map(b => `
+        <div class="admin-kullanici-satir">
+            <span class="admin-kullanici-ad">${esc(b.kullanici_adi)} — ${b.sebep || 'Sebepsiz'}</span>
+            <button class="admin-btn yesil" onclick="socket.emit('admin-ban-kaldir',${b.kullanici_id});this.parentElement.remove()">Kaldır</button>
+        </div>`).join('');
+}
+
+function odaTemizle() {
+    if (!aktifOda) return;
+    if (!confirm('#' + aktifOda + ' sohbetini temizlemek istediğinize emin misiniz?')) return;
+    socket.emit('admin-oda-temizle', aktifOda);
+}
+
+function yeniOdaModalAc() {
+    document.getElementById('yeniOdaAdi').value = '';
+    document.getElementById('yeniOdaAciklama').value = '';
+    document.getElementById('yeniOdaModal').style.display = 'flex';
+    setTimeout(() => document.getElementById('yeniOdaAdi').focus(), 100);
+}
+
+function yeniOdaOlustur() {
+    const ad = document.getElementById('yeniOdaAdi').value.trim();
+    const aciklama = document.getElementById('yeniOdaAciklama').value.trim();
+    if (!ad) { toast('Oda adı gerekli!', 'hata'); return; }
+    socket.emit('admin-oda-olustur', { ad, aciklama });
+    modalKapat('yeniOdaModal');
+}
+
+function odaSil(odaId) {
+    if (!confirm('Bu odayı silmek istediğinize emin misiniz?')) return;
+    socket.emit('admin-oda-sil', odaId);
+}
+
+// ==================== ENGEL / BAN ====================
+
+function engelleModal(hedefId) {
+    const k = kullanicilar[hedefId]; if (!k) return;
+    document.getElementById('engelModalIcerik').textContent = '"' + k.ad + '" adlı kullanıcıyı engellemek istediğinize emin misiniz?';
+    document.getElementById('engelOnayBtn').onclick = () => { socket.emit('engelle', hedefId); modalKapat('engelModal'); };
+    document.getElementById('engelModal').style.display = 'flex';
+}
+function engelKaldir(hedefId) { socket.emit('engel-kaldir', hedefId); }
+
+function banModalAc(hedefId) {
+    document.getElementById('banSebep').value = '';
+    document.getElementById('banSure').value = '0';
+    document.getElementById('banOnayBtn').onclick = () => {
+        const sebep = document.getElementById('banSebep').value.trim();
+        const sure = parseInt(document.getElementById('banSure').value) || 0;
+        socket.emit('admin-banla', { hedefId: parseInt(hedefId), sebep, sureDk: sure });
+        modalKapat('banModal');
+    };
+    document.getElementById('banModal').style.display = 'flex';
+}
+
+function modalKapat(id) { document.getElementById(id).style.display = 'none'; }
+
+// ==================== LİGHTBOX ====================
 function lightboxAc(url) {
     document.getElementById('lightboxImg').src = url;
     document.getElementById('lightbox').classList.add('aktif');
@@ -542,20 +779,24 @@ function lightboxKapat() {
     document.getElementById('lightboxImg').src = '';
 }
 
-// ---- ENGELLEME ----
-function engelleModal(hedefId) {
-    const k = kullanicilar[hedefId]; if (!k) return;
-    document.getElementById('engelModalIcerik').textContent = '"' + k.ad + '" adlı kullanıcıyı engellemek istediğinize emin misiniz?';
-    document.getElementById('engelOnayBtn').onclick = () => { socket.emit('engelle', hedefId); modalKapat('engelModal'); };
-    document.getElementById('engelModal').style.display = 'flex';
+// ==================== TEMA / MOBİL ====================
+function temaDegistir() {
+    tema = tema === 'karanlik' ? 'aydinlik' : 'karanlik';
+    document.documentElement.setAttribute('data-tema', tema);
+    localStorage.setItem('boom-tema', tema);
+    toast(tema === 'karanlik' ? '🌙 Karanlık tema' : '☀️ Aydınlık tema');
 }
-function engelKaldir(hedefId) { socket.emit('engel-kaldir', hedefId); }
-function modalKapat(id) { document.getElementById(id).style.display = 'none'; }
 
-// ---- ÇIKIŞ ----
-function cikisYap() { location.reload(); }
+function sidebarAc() {
+    document.getElementById('sidebar').classList.add('mobil-acik');
+    document.getElementById('sidebarOverlay').classList.add('aktif');
+}
+function sidebarKapat() {
+    document.getElementById('sidebar').classList.remove('mobil-acik');
+    document.getElementById('sidebarOverlay').classList.remove('aktif');
+}
 
-// ---- TOAST ----
+// ==================== TOAST ====================
 function toast(mesaj, tip = 'bilgi') {
     const kap = document.getElementById('toastKap');
     const div = document.createElement('div'); div.className = 'toast';
@@ -564,9 +805,16 @@ function toast(mesaj, tip = 'bilgi') {
     setTimeout(() => { div.classList.add('cikis'); setTimeout(() => div.remove(), 250); }, 3500);
 }
 
-// ---- GÜVENLİK ----
+// ==================== GÜVENLİK ====================
 function esc(str) {
-    return String(str)
+    return String(str || '')
         .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
         .replace(/"/g,'&quot;').replace(/'/g,'&#039;');
+}
+
+// iOS keyboard fix
+if (/iPhone|iPad|iPod/.test(navigator.userAgent)) {
+    window.addEventListener('resize', () => {
+        document.getElementById('mesajFooter').style.paddingBottom = '';
+    });
 }
