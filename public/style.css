@@ -667,3 +667,62 @@ body {
     }
   }
 }
+
+/* ===== YENİ STİLLER ===== */
+
+/* Auth tabs */
+.auth-tabs { display:flex; gap:0; margin-bottom:22px; background:var(--bg-input2); border-radius:var(--r-md); padding:3px; border:1px solid var(--kenar); }
+.auth-tab { flex:1; padding:8px; border:none; background:transparent; color:var(--t2); font-size:13px; font-weight:600; cursor:pointer; border-radius:calc(var(--r-md) - 2px); transition:var(--t); font-family:'Outfit',sans-serif; }
+.auth-tab.aktif { background:var(--mavi); color:white; box-shadow:0 2px 8px var(--mavi-dim); }
+
+/* Şifre input sarici */
+.sifre-sarici { position:relative; }
+.sifre-sarici .form-input { padding-right:42px; }
+.sifre-goster-btn { position:absolute; right:10px; top:50%; transform:translateY(-50%); background:none; border:none; cursor:pointer; font-size:14px; padding:4px; color:var(--t3); }
+
+/* Admin only elemanlar */
+.admin-only { display:none; }
+body.admin .admin-only { display:flex; }
+
+/* Bolum baslik satiri */
+.bolum-baslik-satir { display:flex; align-items:center; justify-content:space-between; padding:0 8px 7px; }
+.bolum-baslik-satir .bolum-baslik { padding:0; }
+.yeni-oda-btn { width:18px; height:18px; border-radius:var(--r-sm); background:var(--mavi-dim); border:1px solid var(--mavi-brd); color:var(--mavi2); font-size:14px; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:var(--t); line-height:1; }
+.yeni-oda-btn:hover { background:var(--mavi); color:white; }
+
+/* Oda item */
+.oda-item { display:flex; align-items:center; gap:7px; padding:7px 10px; border-radius:var(--r-md); cursor:pointer; color:var(--t2); font-size:13px; font-weight:500; transition:var(--t); position:relative; user-select:none; }
+.oda-item:hover     { background:var(--bg-hover); color:var(--t1); }
+.oda-item.aktif-oda { background:var(--mavi-dim); color:var(--mavi2); border:1px solid var(--mavi-brd); }
+.oda-sil-btn { position:absolute; right:8px; opacity:0; background:none; border:none; color:var(--kirmizi); cursor:pointer; font-size:12px; padding:2px 4px; border-radius:var(--r-sm); transition:var(--t); }
+.oda-item:hover .oda-sil-btn { opacity:1; }
+
+/* Admin badge */
+.admin-badge { font-size:9px; background:var(--mavi); color:white; padding:1px 5px; border-radius:var(--r-full); font-weight:700; letter-spacing:.5px; margin-left:4px; }
+
+/* Rol rengi */
+#profilRol.admin { color:var(--mavi2); font-weight:600; }
+
+/* Modal genis */
+.modal-genis { max-width:480px; }
+
+/* Admin panel içi */
+.admin-bolum { margin-bottom:18px; }
+.admin-bolum-baslik { font-size:11px; font-weight:700; color:var(--t3); letter-spacing:1px; text-transform:uppercase; margin-bottom:8px; padding-bottom:6px; border-bottom:1px solid var(--kenar); }
+.admin-kullanici-satir { display:flex; align-items:center; gap:8px; padding:7px 0; border-bottom:1px solid var(--kenar); }
+.admin-kullanici-satir:last-child { border-bottom:none; }
+.admin-kullanici-ad { flex:1; font-size:13px; font-weight:500; }
+.admin-btn { padding:5px 10px; border-radius:var(--r-sm); border:none; font-size:11px; font-weight:600; cursor:pointer; transition:var(--t); }
+.admin-btn.ban  { background:rgba(239,68,68,.12); color:var(--kirmizi); border:1px solid rgba(239,68,68,.2); }
+.admin-btn.ban:hover  { background:var(--kirmizi); color:white; }
+.admin-btn.yesil { background:rgba(34,197,94,.12); color:var(--yesil); border:1px solid rgba(34,197,94,.2); }
+.admin-btn.yesil:hover { background:var(--yesil); color:white; }
+.admin-btn.mavi  { background:var(--mavi-dim); color:var(--mavi2); border:1px solid var(--mavi-brd); }
+.admin-btn.mavi:hover  { background:var(--mavi); color:white; }
+
+/* Onay modal butonu */
+.modal-btn.onay { background:var(--mavi); color:white; }
+.modal-btn.onay:hover { background:var(--mavi2); }
+
+/* Ban banner */
+.ban-banner { background:rgba(239,68,68,.1); border:1px solid rgba(239,68,68,.3); border-radius:var(--r-md); padding:10px 14px; margin-bottom:10px; font-size:13px; color:var(--kirmizi); }
