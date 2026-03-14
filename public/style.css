@@ -351,11 +351,77 @@ html,body{height:100%;overflow:hidden;font-family:'Inter',sans-serif;font-size:1
 @keyframes toastOut{from{opacity:1}to{opacity:0;transform:translateY(4px)}}
 .toast-ikon{font-size:14px;flex-shrink:0}
 
+/* ===== MOBİL — Tablet (768px) ===== */
 @media(max-width:768px){
-  .sidebar{position:fixed;left:0;top:0;bottom:0;z-index:500;transform:translateX(-100%)}
+  .sidebar{position:fixed;left:0;top:0;bottom:0;z-index:500;transform:translateX(-100%);box-shadow:4px 0 24px rgba(0,0,0,.5)}
   .sidebar.mobil-acik{transform:translateX(0)}
   .mobil-menu-btn{display:flex}
   .sag-panel{display:none!important}
-  .giris-kart{padding:28px 20px;margin:12px}
-  .mesaj-wrap.kendi .mesaj-row{max-width:85%}
+  .giris-kart{padding:28px 20px;margin:16px}
+  .logo-yazi{font-size:20px}
+  .mesaj-wrap.kendi .mesaj-row{max-width:88%}
+  .mesaj-row{max-width:88%}
+  .sohbet-header{padding:0 12px}
+  .mesaj-footer{padding:6px 10px 10px}
+  .toast-kap{bottom:12px;right:12px;left:12px}
+  .toast{min-width:unset;max-width:100%}
+}
+
+/* ===== MOBİL — Telefon (480px) ===== */
+@media(max-width:480px){
+  .giris-kart{padding:24px 16px;margin:12px;border-radius:var(--r-xl)}
+  .logo-ikon{font-size:22px}
+  .logo-yazi{font-size:18px;letter-spacing:2px}
+  .logo-chat{font-size:11px}
+  .giris-alt{font-size:12px;margin-bottom:20px}
+  .form-input{padding:10px 12px;font-size:13px}
+  .giris-btn{padding:11px;font-size:13px}
+  .avatar-onizleme{width:60px;height:60px}
+
+  .sidebar{width:100vw}
+  .sohbet-header{height:46px;padding:0 10px;gap:8px}
+  .header-baslik{font-size:13px}
+
+  .mesaj-alani{padding:8px 10px 6px}
+  .hosgeldin-ikon{font-size:34px}
+  .hosgeldin-mesaji h2{font-size:16px}
+  .hosgeldin-mesaji p{font-size:12px}
+
+  .mesaj-wrap.kendi .mesaj-row{max-width:92%}
+  .mesaj-row{max-width:92%}
+  .mesaj-avatar{width:28px;height:28px;font-size:11px}
+  .mesaj-balon{font-size:13px;padding:8px 11px}
+  .mesaj-yazar{font-size:11px}
+  .mesaj-zaman-meta{font-size:9px}
+  .mesaj-zaman-alt{font-size:9px}
+  .mesaj-foto{max-width:220px;max-height:240px}
+  .yaziyor-alan{padding:0 10px 3px;font-size:10px}
+
+  .mesaj-footer{padding:6px 8px 10px}
+  .mesaj-input-sarici{padding:6px 6px 6px 10px}
+  .mesaj-input{font-size:13px}
+  .gonder-btn{width:30px;height:30px}
+  .foto-ekle-btn{width:28px;height:28px}
+
+  .sidebar-ust{padding:0 10px;height:46px}
+  .sidebar-baslik{font-size:12px;letter-spacing:2px}
+  .sidebar-profil{padding:8px 10px}
+  .profil-avatar-kucuk{width:30px;height:30px;font-size:12px}
+  .profil-ad{font-size:12px}
+  .bolum-baslik{font-size:8px}
+  .kanal-item{font-size:12px}
+  .dm-item{font-size:12px}
+  .kullanici-ad-metin{font-size:12px}
+
+  .toast{font-size:12px;padding:9px 12px}
+  .yeni-mesaj-ayrac-yazi{font-size:10px}
+  .sistem-mesaj span{font-size:10px;padding:2px 8px}
+}
+
+/* ===== Dokunmatik iyileştirme ===== */
+@media(hover:none){
+  .gonder-btn{width:36px;height:36px}
+  .foto-ekle-btn{width:34px;height:34px}
+  .ikon-btn{width:34px;height:34px}
+  .modal-btn{padding:10px 20px}
 }
