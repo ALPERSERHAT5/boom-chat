@@ -851,18 +851,43 @@ async function aramaBaslat(hedefId, tip = 'goruntulu') {
     aramaHedefId = hedefId;
     aramaKabul = false;
 
+    // HTTPS kontrolü
+    if (location.protocol !== 'https:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
+        toast('⚠️ Sesli/görüntülü için HTTPS gerekli!', 'hata');
+        return;
+    }
+
+    // Tarayıcı desteği kontrolü
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        toast('⚠️ Tarayıcınız kamera/mikrofonu desteklemiyor!', 'hata');
+        return;
+    }
+
     try {
-        yerelStream = await navigator.mediaDevices.getUserMedia({
-            video: tip === 'goruntulu',
-            audio: true
-        });
+        // Önce sadece ses ile dene, başarısız olursa hatayı göster
+        const constraints = {
+            audio: true,
+            video: tip === 'goruntulu' ? { facingMode: 'user' } : false
+        };
+        yerelStream = await navigator.mediaDevices.getUserMedia(constraints);
     } catch (e) {
-        toast('Kamera/mikrofon erişimi reddedildi!', 'hata'); return;
+        console.error('getUserMedia hatası:', e.name, e.message);
+        if (e.name === 'NotAllowedError' || e.name === 'PermissionDeniedError') {
+            toast('❌ Kamera/mikrofon izni verilmedi! Tarayıcı ayarlarından izin verin.', 'hata');
+        } else if (e.name === 'NotFoundError') {
+            toast('❌ Kamera veya mikrofon bulunamadı!', 'hata');
+        } else if (e.name === 'NotReadableError') {
+            toast('❌ Kamera/mikrofon başka uygulama tarafından kullanılıyor!', 'hata');
+        } else {
+            toast('❌ Hata: ' + e.message, 'hata');
+        }
+        return;
     }
 
     aramaPenceresiniAc('arayan', tip);
-    document.getElementById('yerelVideo').srcObject = yerelStream;
-    socket.emit('arama-baslat', { hedefId, tip });
+    const yerelVideoEl = document.getElementById('yerelVideo');
+    if (yerelVideoEl) yerelVideoEl.srcObject = yerelStream;
+    socket.emit('arama-baslat', { hedefId: parseInt(hedefId), tip });
     toast('📞 Bağlanıyor...');
 }
 
@@ -1006,13 +1031,23 @@ async function aramaKabulEt(arayanId, tip) {
     const gelenPencere = document.getElementById('gelenAramaPenceresi');
     if (gelenPencere) gelenPencere.remove();
 
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        toast('⚠️ Tarayıcınız kamera/mikrofonu desteklemiyor!', 'hata');
+        socket.emit('arama-reddet', { arayanId }); return;
+    }
+
     try {
         yerelStream = await navigator.mediaDevices.getUserMedia({
-            video: tip === 'goruntulu',
-            audio: true
+            audio: true,
+            video: tip === 'goruntulu' ? { facingMode: 'user' } : false
         });
     } catch (e) {
-        toast('Kamera/mikrofon erişimi reddedildi!', 'hata');
+        console.error('getUserMedia hatası:', e.name, e.message);
+        if (e.name === 'NotAllowedError' || e.name === 'PermissionDeniedError') {
+            toast('❌ Kamera/mikrofon izni verilmedi!', 'hata');
+        } else {
+            toast('❌ Hata: ' + e.message, 'hata');
+        }
         socket.emit('arama-reddet', { arayanId }); return;
     }
 
