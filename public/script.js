@@ -335,6 +335,9 @@ function socketOlaylariKur() {
     });
     socket.on('sistem-bildirim', ({ metin }) => toast('📢 ' + metin));
 
+    // WebRTC olaylarını kur
+    webrtcOlaylariKur();
+
     // Fotoğraf inputu
     document.getElementById('fotoInput').addEventListener('change', function () {
         const dosya = this.files[0]; if (!dosya) return;
@@ -526,7 +529,11 @@ function adminHeaderGuncelle() {
 function headerAksiyonlarGuncelle() {
     if (!aktifKullanici) { document.getElementById('headerAksiyonlar').innerHTML = ''; return; }
     const engellendi = engelliIdler.has(aktifKullanici.id);
-    let html = engellendi
+    let html = `
+        <button class="aksiyon-btn mavi" onclick="aramaBaslat('${aktifKullanici.id}','sesli')" title="Sesli Ara">📞</button>
+        <button class="aksiyon-btn mavi" onclick="aramaBaslat('${aktifKullanici.id}','goruntulu')" title="Görüntülü Ara">📹</button>
+    `;
+    html += engellendi
         ? `<button class="aksiyon-btn" onclick="engelKaldir('${aktifKullanici.id}')">✅ <span class="aksiyon-yazi">Engeli Kaldır</span></button>`
         : `<button class="aksiyon-btn tehlikeli" onclick="engelleModal('${aktifKullanici.id}')">🚫 <span class="aksiyon-yazi">Engelle</span></button>`;
     if (ben?.rol === 'admin') {
@@ -548,6 +555,8 @@ function sagPanelGuncelle() {
             <div class="sag-panel-durum"><span class="online-nokta"></span> Çevrimiçi</div>
         </div>
         <div class="sag-panel-aksiyonlar">
+            <button class="arama-baslat-btn" onclick="aramaBaslat('${k.id}','sesli')">📞 Sesli Ara</button>
+            <button class="arama-baslat-btn goruntulu" onclick="aramaBaslat('${k.id}','goruntulu')">📹 Görüntülü</button>
             ${engellendi
                 ? `<button class="aksiyon-btn" onclick="engelKaldir('${k.id}')">✅ Engeli Kaldır</button>`
                 : `<button class="aksiyon-btn tehlikeli" onclick="engelleModal('${k.id}')">🚫 Engelle</button>`}
@@ -818,3 +827,289 @@ if (/iPhone|iPad|iPod/.test(navigator.userAgent)) {
         document.getElementById('mesajFooter').style.paddingBottom = '';
     });
 }
+
+// ==================== WebRTC GÖRÜNTÜLÜ/SESLİ ====================
+
+let pcBaglanti = null;      // RTCPeerConnection
+let yerelStream = null;     // Kendi kamera/mikrofon
+let aramaHedefId = null;    // Arama yapılan kişi
+let aramaKabul = false;     // Arama kabul edildi mi
+let videoAcik = true;
+let sesAcik = true;
+
+// STUN sunucuları (ücretsiz Google STUN)
+const RTC_CONFIG = {
+    iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:stun1.l.google.com:19302' },
+        { urls: 'stun:stun2.l.google.com:19302' }
+    ]
+};
+
+// ---- Arama Başlat ----
+async function aramaBaslat(hedefId, tip = 'goruntulu') {
+    aramaHedefId = hedefId;
+    aramaKabul = false;
+
+    try {
+        yerelStream = await navigator.mediaDevices.getUserMedia({
+            video: tip === 'goruntulu',
+            audio: true
+        });
+    } catch (e) {
+        toast('Kamera/mikrofon erişimi reddedildi!', 'hata'); return;
+    }
+
+    aramaPenceresiniAc('arayan', tip);
+    document.getElementById('yerelVideo').srcObject = yerelStream;
+    socket.emit('arama-baslat', { hedefId, tip });
+    toast('📞 Bağlanıyor...');
+}
+
+// ---- Gelen Arama ----
+socket.on && (window._webrtcOlaylarKuruldu = window._webrtcOlaylarKuruldu || false);
+
+function webrtcOlaylariKur() {
+    if (window._webrtcOlaylarKuruldu) return;
+    window._webrtcOlaylarKuruldu = true;
+
+    socket.on('gelen-arama', ({ arayanId, arayanAd, arayanAvatar, tip }) => {
+        aramaHedefId = arayanId;
+        gelenAramaPenceresiniAc(arayanId, arayanAd, arayanAvatar, tip);
+    });
+
+    socket.on('arama-kabul-edildi', async ({ kabulEdenId }) => {
+        aramaKabul = true;
+        toast('✅ Arama kabul edildi!');
+        await webrtcBaslat(kabulEdenId, true);
+    });
+
+    socket.on('arama-reddedildi', () => {
+        toast('❌ Arama reddedildi.', 'hata');
+        aramayiKapat();
+    });
+
+    socket.on('arama-kapandi', () => {
+        toast('📵 Arama sonlandırıldı.');
+        aramayiKapat();
+    });
+
+    socket.on('arama-hata', (mesaj) => {
+        toast('⚠️ ' + mesaj, 'hata');
+        aramayiKapat();
+    });
+
+    socket.on('webrtc-offer', async ({ gonderenId, offer }) => {
+        await webrtcCevapVer(gonderenId, offer);
+    });
+
+    socket.on('webrtc-answer', async ({ answer }) => {
+        if (pcBaglanti) await pcBaglanti.setRemoteDescription(new RTCSessionDescription(answer));
+    });
+
+    socket.on('ice-candidate', async ({ candidate }) => {
+        try {
+            if (pcBaglanti && candidate) await pcBaglanti.addIceCandidate(new RTCIceCandidate(candidate));
+        } catch (e) {}
+    });
+}
+
+// ---- WebRTC Başlat (Arayan tarafı) ----
+async function webrtcBaslat(hedefId, arayan = true) {
+    pcBaglanti = new RTCPeerConnection(RTC_CONFIG);
+
+    // Yerel stream ekle
+    if (yerelStream) {
+        yerelStream.getTracks().forEach(track => pcBaglanti.addTrack(track, yerelStream));
+    }
+
+    // Uzak stream al
+    pcBaglanti.ontrack = (e) => {
+        const uzakVideo = document.getElementById('uzakVideo');
+        if (uzakVideo && e.streams[0]) uzakVideo.srcObject = e.streams[0];
+    };
+
+    // ICE candidate gönder
+    pcBaglanti.onicecandidate = (e) => {
+        if (e.candidate) socket.emit('ice-candidate', { hedefId, candidate: e.candidate });
+    };
+
+    // Bağlantı durumu
+    pcBaglanti.onconnectionstatechange = () => {
+        const durum = document.getElementById('aramaDurum');
+        if (!durum) return;
+        if (pcBaglanti.connectionState === 'connected') durum.textContent = '🟢 Bağlandı';
+        else if (pcBaglanti.connectionState === 'disconnected') { durum.textContent = '🔴 Bağlantı kesildi'; setTimeout(aramayiKapat, 2000); }
+    };
+
+    if (arayan) {
+        const offer = await pcBaglanti.createOffer();
+        await pcBaglanti.setLocalDescription(offer);
+        socket.emit('webrtc-offer', { hedefId, offer });
+    }
+}
+
+// ---- WebRTC Cevap Ver (Alıcı tarafı) ----
+async function webrtcCevapVer(gonderenId, offer) {
+    pcBaglanti = new RTCPeerConnection(RTC_CONFIG);
+
+    if (yerelStream) {
+        yerelStream.getTracks().forEach(track => pcBaglanti.addTrack(track, yerelStream));
+    }
+
+    pcBaglanti.ontrack = (e) => {
+        const uzakVideo = document.getElementById('uzakVideo');
+        if (uzakVideo && e.streams[0]) uzakVideo.srcObject = e.streams[0];
+    };
+
+    pcBaglanti.onicecandidate = (e) => {
+        if (e.candidate) socket.emit('ice-candidate', { hedefId: gonderenId, candidate: e.candidate });
+    };
+
+    pcBaglanti.onconnectionstatechange = () => {
+        const durum = document.getElementById('aramaDurum');
+        if (!durum) return;
+        if (pcBaglanti.connectionState === 'connected') durum.textContent = '🟢 Bağlandı';
+        else if (pcBaglanti.connectionState === 'disconnected') { durum.textContent = '🔴 Bağlantı kesildi'; setTimeout(aramayiKapat, 2000); }
+    };
+
+    await pcBaglanti.setRemoteDescription(new RTCSessionDescription(offer));
+    const answer = await pcBaglanti.createAnswer();
+    await pcBaglanti.setLocalDescription(answer);
+    socket.emit('webrtc-answer', { hedefId: gonderenId, answer });
+}
+
+// ---- Aramayı Kapat ----
+function aramayiKapat() {
+    if (pcBaglanti) { pcBaglanti.close(); pcBaglanti = null; }
+    if (yerelStream) { yerelStream.getTracks().forEach(t => t.stop()); yerelStream = null; }
+    if (aramaHedefId && !aramaKabul) {
+        // Zaten kapatıldıysa tekrar gönderme
+    }
+    aramaHedefId = null; aramaKabul = false;
+    videoAcik = true; sesAcik = true;
+
+    const pencere = document.getElementById('aramaPenceresi');
+    if (pencere) pencere.remove();
+    const gelenPencere = document.getElementById('gelenAramaPenceresi');
+    if (gelenPencere) gelenPencere.remove();
+}
+
+function aramaKapat() {
+    if (aramaHedefId) socket.emit('arama-kapat', { hedefId: aramaHedefId });
+    aramayiKapat();
+}
+
+// ---- Aramayı Kabul Et ----
+async function aramaKabulEt(arayanId, tip) {
+    aramaKabul = true;
+    const gelenPencere = document.getElementById('gelenAramaPenceresi');
+    if (gelenPencere) gelenPencere.remove();
+
+    try {
+        yerelStream = await navigator.mediaDevices.getUserMedia({
+            video: tip === 'goruntulu',
+            audio: true
+        });
+    } catch (e) {
+        toast('Kamera/mikrofon erişimi reddedildi!', 'hata');
+        socket.emit('arama-reddet', { arayanId }); return;
+    }
+
+    aramaPenceresiniAc('alan', tip);
+    document.getElementById('yerelVideo').srcObject = yerelStream;
+    socket.emit('arama-kabul', { arayanId });
+    await webrtcBaslat(arayanId, false);
+}
+
+// ---- Aramayı Reddet ----
+function aramaReddet(arayanId) {
+    socket.emit('arama-reddet', { arayanId });
+    const gelenPencere = document.getElementById('gelenAramaPenceresi');
+    if (gelenPencere) gelenPencere.remove();
+}
+
+// ---- Video Aç/Kapat ----
+function videoToggle() {
+    if (!yerelStream) return;
+    const videoTrack = yerelStream.getVideoTracks()[0];
+    if (!videoTrack) return;
+    videoAcik = !videoAcik;
+    videoTrack.enabled = videoAcik;
+    const btn = document.getElementById('videoBtn');
+    if (btn) btn.textContent = videoAcik ? '📹' : '📵';
+}
+
+// ---- Ses Aç/Kapat ----
+function sesToggle() {
+    if (!yerelStream) return;
+    const audioTrack = yerelStream.getAudioTracks()[0];
+    if (!audioTrack) return;
+    sesAcik = !sesAcik;
+    audioTrack.enabled = sesAcik;
+    const btn = document.getElementById('sesBtn');
+    if (btn) btn.textContent = sesAcik ? '🎤' : '🔇';
+}
+
+// ==================== ARAMA PENCERELERİ ====================
+
+function aramaPenceresiniAc(mod, tip) {
+    const mevcut = document.getElementById('aramaPenceresi');
+    if (mevcut) mevcut.remove();
+
+    const div = document.createElement('div');
+    div.id = 'aramaPenceresi';
+    div.className = 'arama-penceresi';
+    div.innerHTML = `
+        <div class="arama-ust">
+            <span id="aramaDurum">${mod === 'arayan' ? '📞 Bağlanıyor...' : '📞 Bağlandı'}</span>
+            <span class="arama-kisi">${aktifKullanici ? esc(aktifKullanici.ad) : ''}</span>
+        </div>
+        <div class="video-alan">
+            ${tip === 'goruntulu' ? `
+                <video id="uzakVideo" class="uzak-video" autoplay playsinline></video>
+                <video id="yerelVideo" class="yerel-video" autoplay playsinline muted></video>
+            ` : `
+                <div class="ses-only-icon">🎤</div>
+                <video id="yerelVideo" style="display:none" autoplay playsinline muted></video>
+                <audio id="uzakVideo" autoplay></audio>
+            `}
+        </div>
+        <div class="arama-kontroller">
+            ${tip === 'goruntulu' ? `<button class="arama-btn" id="videoBtn" onclick="videoToggle()">📹</button>` : ''}
+            <button class="arama-btn" id="sesBtn" onclick="sesToggle()">🎤</button>
+            <button class="arama-btn kapat-btn" onclick="aramaKapat()">📵</button>
+        </div>`;
+    document.body.appendChild(div);
+}
+
+function gelenAramaPenceresiniAc(arayanId, arayanAd, arayanAvatar, tip) {
+    const mevcut = document.getElementById('gelenAramaPenceresi');
+    if (mevcut) mevcut.remove();
+
+    const div = document.createElement('div');
+    div.id = 'gelenAramaPenceresi';
+    div.className = 'gelen-arama-penceresi';
+    div.innerHTML = `
+        <div class="gelen-arama-icerik">
+            <div class="gelen-arama-avatar">
+                ${arayanAvatar
+                    ? `<img src="${arayanAvatar}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`
+                    : arayanAd[0].toUpperCase()}
+            </div>
+            <div class="gelen-arama-ad">${esc(arayanAd)}</div>
+            <div class="gelen-arama-tip">${tip === 'goruntulu' ? '📹 Görüntülü arama' : '📞 Sesli arama'}</div>
+            <div class="gelen-arama-butonlar">
+                <button class="arama-btn kabul-btn" onclick="aramaKabulEt('${arayanId}','${tip}')">✅</button>
+                <button class="arama-btn ret-btn" onclick="aramaReddet('${arayanId}')">❌</button>
+            </div>
+        </div>`;
+    document.body.appendChild(div);
+
+    // Zil sesi animasyonu
+    div.style.animation = 'zil 0.5s ease infinite';
+}
+
+// WebRTC olaylarını socket bağlanınca kur
+const _orijinalSocketBaglan = socketBaglan;
+// socketBaglan override - webrtc olaylarını kur
