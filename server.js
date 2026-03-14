@@ -174,9 +174,15 @@ io.on('connection', async (socket) => {
 
     if (!engellemeler[ben.id]) engellemeler[ben.id] = new Set();
 
+    // Baglananı hemen kaydet (oda girmeden de gorunsun)
+    aktifKullanicilar[socket.id] = { kullanici: ben, odaAdi: null };
+
     // Oda listesini gonder
     const odalar = await db.odalariGetir();
     socket.emit('odalar-listesi', odalar);
+    
+    // Herkese yeni kullaniciyi bildir
+    socket.broadcast.emit('kullanici-katildi-oda', { kullanici: ben, odaAdi: null });
 
     // ---- ODA GİR ----
     socket.on('oda-gir', async (odaAdi) => {
