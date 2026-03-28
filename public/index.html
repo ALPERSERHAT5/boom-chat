@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="tr" data-tema="karanlik">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
@@ -7,289 +8,615 @@
     <meta name="theme-color" content="#07090f">
     <title>BOOM Chat</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap"
+        rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
+
 <body>
 
-<!-- ========== GİRİŞ / KAYIT ========== -->
-<div class="ekran aktif" id="girisEkrani">
-    <div class="giris-bg"><div class="giris-grid"></div><div class="giris-glow"></div></div>
-    <div class="giris-kart">
-        <div class="giris-logo">
-            <span class="logo-ikon">💥</span>
-            <span class="logo-yazi">BOOM</span>
-            <span class="logo-chat">chat</span>
+    <!-- ========== GİRİŞ / KAYIT ========== -->
+    <div class="ekran aktif" id="girisEkrani">
+        <div class="giris-bg">
+            <div class="giris-grid"></div>
+            <div class="giris-glow"></div>
         </div>
-
-        <!-- Tab seçici -->
-        <div class="auth-tabs">
-            <button class="auth-tab aktif" onclick="tabSec('giris')">Giriş Yap</button>
-            <button class="auth-tab" onclick="tabSec('kayit')">Kayıt Ol</button>
-        </div>
-
-        <!-- GİRİŞ FORMU -->
-        <div id="girisForm">
-            <div class="form-alan">
-                <label class="form-etiket">KULLANICI ADI</label>
-                <input type="text" id="girisAdi" class="form-input" placeholder="Kullanıcı adınız"
-                    autocomplete="username" autocorrect="off" autocapitalize="off">
+        <div class="giris-kart">
+            <div class="giris-logo">
+                <img src="/uploads/LOGOM.png" style="height:48px;object-fit:contain">
             </div>
-            <div class="form-alan">
-                <label class="form-etiket">ŞİFRE</label>
-                <div class="sifre-sarici">
-                    <input type="password" id="girisSifre" class="form-input" placeholder="Şifreniz"
-                        autocomplete="current-password">
-                    <button class="sifre-goster-btn" onclick="sifreGoster('girisSifre')">👁</button>
+
+            <div class="auth-tabs">
+                <button class="auth-tab aktif" onclick="tabSec('giris')">Giriş Yap</button>
+                <button class="auth-tab" onclick="tabSec('kayit')">Kayıt Ol</button>
+            </div>
+
+            <div id="girisForm">
+                <div class="form-alan">
+                    <label class="form-etiket">KULLANICI ADI</label>
+                    <input type="text" id="girisAdi" class="form-input" placeholder="Kullanıcı adınız"
+                        autocomplete="username" autocorrect="off" autocapitalize="off">
                 </div>
-            </div>
-            <div class="hata-kutu" id="girisHata"></div>
-            <button class="giris-btn" id="girisBtn" onclick="girisYap()">
-                <span class="btn-yazi">GİRİŞ YAP</span>
-                <span class="btn-ok">→</span>
-            </button>
-        </div>
-
-        <!-- KAYIT FORMU -->
-        <div id="kayitForm" style="display:none">
-            <div class="form-alan">
-                <label class="form-etiket">KULLANICI ADI</label>
-                <input type="text" id="kayitAdi" class="form-input" placeholder="Kullanıcı adı seçin"
-                    maxlength="20" autocorrect="off" autocapitalize="off">
-            </div>
-            <div class="form-alan">
-                <label class="form-etiket">ŞİFRE</label>
-                <div class="sifre-sarici">
-                    <input type="password" id="kayitSifre" class="form-input" placeholder="En az 4 karakter"
-                        autocomplete="new-password">
-                    <button class="sifre-goster-btn" onclick="sifreGoster('kayitSifre')">👁</button>
-                </div>
-            </div>
-            <div class="form-alan">
-                <label class="form-etiket">PROFİL FOTOĞRAFI <span class="opsiyonel">— opsiyonel</span></label>
-                <div class="avatar-yukle-alan" onclick="document.getElementById('avatarInput').click()">
-                    <div class="avatar-onizleme" id="avatarOnizleme">
-                        <span class="avatar-ikon">+</span>
-                        <span class="avatar-yazi">Ekle</span>
+                <div class="form-alan">
+                    <label class="form-etiket">ŞİFRE</label>
+                    <div class="sifre-sarici">
+                        <input type="password" id="girisSifre" class="form-input" placeholder="Şifreniz"
+                            autocomplete="current-password">
+                        <button class="sifre-goster-btn" onclick="sifreGoster('girisSifre')">👁</button>
                     </div>
                 </div>
-                <input type="file" id="avatarInput" accept="image/*" hidden>
+                <div class="hata-kutu" id="girisHata"></div>
+                <button class="giris-btn" id="girisBtn" onclick="girisYap()">
+                    <span class="btn-yazi">GİRİŞ YAP</span>
+                    <span class="btn-ok">→</span>
+                </button>
+            </div>
+
+            <div id="kayitForm" style="display:none">
+                <div class="form-alan">
+                    <label class="form-etiket">KULLANICI ADI</label>
+                    <input type="text" id="kayitAdi" class="form-input" placeholder="Kullanıcı adı seçin" maxlength="20"
+                        autocorrect="off" autocapitalize="off">
+                </div>
+                <div class="form-alan">
+                    <label class="form-etiket">ŞİFRE</label>
+                    <div class="sifre-sarici">
+                        <input type="password" id="kayitSifre" class="form-input" placeholder="En az 4 karakter"
+                            autocomplete="new-password">
+                        <button class="sifre-goster-btn" onclick="sifreGoster('kayitSifre')">👁</button>
+                    </div>
+                </div>
+                <div class="form-alan">
+                    <label class="form-etiket">PROFİL FOTOĞRAFI <span class="opsiyonel">— opsiyonel</span></label>
+                    <div class="avatar-yukle-alan" onclick="document.getElementById('avatarInput').click()">
+                        <div class="avatar-onizleme" id="avatarOnizleme">
+                            <span class="avatar-ikon">+</span>
+                            <span class="avatar-yazi">Ekle</span>
+                        </div>
+                    </div>
+                    <input type="file" id="avatarInput" accept="image/*" hidden>
+                </div>
+                <div class="form-alan admin-kod-alan">
+                    <label class="form-etiket" style="cursor:pointer;user-select:none" onclick="toggleAdminKod()">
+                        <span id="adminKodToggleIcon">▶</span> Admin Girişi
+                    </label>
+                    <div id="adminKodSarici" style="display:none;margin-top:6px">
+                        <input type="password" id="adminKodu" class="form-input" placeholder="Admin kodu"
+                            autocomplete="off" autocorrect="off">
+                    </div>
+                </div>
+                <div class="hata-kutu" id="kayitHata"></div>
+                <button class="giris-btn" id="kayitBtn" onclick="kayitOl()">
+                    <span class="btn-yazi">KAYIT OL</span>
+                    <span class="btn-ok">→</span>
+                </button>
+            </div>
+
+            <p class="giris-not">Enter tuşuyla da devam edebilirsiniz</p>
+        </div>
+    </div>
+
+    <!-- ========== SOHBET EKRANI ========== -->
+    <div class="ekran" id="sohbetEkrani">
+        <div class="sidebar-overlay" id="sidebarOverlay" onclick="sidebarKapat()"></div>
+
+        <!-- SIDEBAR -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-ust">
+                <div class="sidebar-logo">
+                    <img src="/uploads/LOGOM.png" style="height:32px;object-fit:contain">
+                </div>
+                <div style="display:flex;gap:3px">
+                    <button class="ikon-btn" title="Tema" onclick="temaDegistir()">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <circle cx="12" cy="12" r="5" />
+                            <line x1="12" y1="1" x2="12" y2="3" />
+                            <line x1="12" y1="21" x2="12" y2="23" />
+                            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+                            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+                            <line x1="1" y1="12" x2="3" y2="12" />
+                            <line x1="21" y1="12" x2="23" y2="12" />
+                        </svg>
+                    </button>
+                    <button class="ikon-btn mobil-sidebar-kapat" onclick="sidebarKapat()">✕</button>
+                </div>
+            </div>
+
+            <div class="sidebar-profil" onclick="kisiselProfilAc()" style="cursor:pointer">
+                <div class="profil-avatar-kucuk" id="sidebarAvatar">?</div>
+                <div class="profil-bilgi">
+                    <div class="profil-ad" id="sidebarAd">...</div>
+                    <div class="profil-durum">
+                        <span class="online-nokta"></span>
+                        <span id="profilRol" class="profil-durum-rol">Üye</span>
+                    </div>
+                </div>
+                <button class="cikis-btn" onclick="event.stopPropagation();cikisYap()" title="Çıkış">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                        <polyline points="16 17 21 12 16 7" />
+                        <line x1="21" y1="12" x2="9" y2="12" />
+                    </svg>
+                </button>
+            </div>
+
+            <!-- ODALAR -->
+            <div class="sidebar-bolum">
+                <div class="bolum-baslik-satir">
+                    <span class="bolum-baslik">ODALAR</span>
+                    <button class="yeni-oda-btn admin-only" id="yeniOdaBtn" onclick="yeniOdaModalAc()"
+                        title="Yeni oda">+</button>
+                </div>
+                <div id="odaListesi"></div>
+            </div>
+
+            <!-- GRUPLAR -->
+            <div class="sidebar-bolum">
+                <div class="bolum-baslik-satir">
+                    <span class="bolum-baslik">GRUPLAR</span>
+                    <button class="yeni-oda-btn" onclick="yeniGrupModal()" title="Yeni grup">+</button>
+                </div>
+                <div id="grupListesi"></div>
+            </div>
+
+            <!-- DM LİSTESİ -->
+            <div class="sidebar-bolum">
+                <div class="bolum-baslik">MESAJLAR</div>
+                <div class="dm-listesi" id="dmListesi"></div>
+            </div>
+
+            <!-- ÇEVRİMİÇİ -->
+            <div class="sidebar-bolum sidebar-bolum-flex">
+                <div class="bolum-baslik">ÇEVRİMİÇİ — <span id="kullaniciSayisi">0</span></div>
+                <div class="kullanici-listesi" id="kullaniciListesi"></div>
+            </div>
+        </aside>
+
+        <!-- ANA ALAN -->
+        <main class="ana-alan">
+            <!-- ALT NAVİGASYON (4 sekme) -->
+            <nav class="alt-nav" id="altNav">
+                <button class="alt-nav-btn aktif" id="navSohbet" onclick="navGit('sohbet')">
+                    <span class="alt-nav-ikon">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                        </svg>
+                    </span>
+                    <span class="alt-nav-yazi">Sohbet</span>
+                </button>
+                <button class="alt-nav-btn" id="navAkis" onclick="navGit('akis')">
+                    <span class="alt-nav-ikon">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+                            <polyline points="9 22 9 12 15 12 15 22" />
+                        </svg>
+                    </span>
+                    <span class="alt-nav-yazi">Akış</span>
+                </button>
+                <button class="alt-nav-btn" id="navKesfet" onclick="navGit('kesfet')">
+                    <span class="alt-nav-ikon">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <circle cx="11" cy="11" r="8" />
+                            <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                        </svg>
+                    </span>
+                    <span class="alt-nav-yazi">Keşfet</span>
+                </button>
+                <!-- YENİ: REELS SEKMESİ -->
+                <button class="alt-nav-btn" id="navReels" onclick="navGit('reels')">
+                    <span class="alt-nav-ikon">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18" />
+                            <line x1="7" y1="2" x2="7" y2="22" />
+                            <line x1="17" y1="2" x2="17" y2="22" />
+                            <line x1="2" y1="12" x2="22" y2="12" />
+                            <line x1="2" y1="7" x2="7" y2="7" />
+                            <line x1="2" y1="17" x2="7" y2="17" />
+                            <line x1="17" y1="17" x2="22" y2="17" />
+                            <line x1="17" y1="7" x2="22" y2="7" />
+                        </svg>
+                    </span>
+                    <span class="alt-nav-yazi">Reels</span>
+                </button>
+            </nav>
+
+            <!-- SOHBET HEADER -->
+            <header class="sohbet-header" id="sohbetHeader">
+                <button class="mobil-menu-btn" onclick="sidebarAc()">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="3" y1="6" x2="21" y2="6" />
+                        <line x1="3" y1="12" x2="21" y2="12" />
+                        <line x1="3" y1="18" x2="21" y2="18" />
+                    </svg>
+                </button>
+                <div class="header-baslik" id="headerBaslik">
+                    <span class="header-ikon">#</span>
+                    <span id="headerAd">genel</span>
+                </div>
+                <div class="header-aksiyonlar" id="headerAksiyonlar"></div>
+            </header>
+
+            <!-- SOHBET MESAJ ALANI -->
+            <div class="mesaj-alani" id="mesajAlani">
+                <div class="hosgeldin-mesaji">
+                    <div class="hosgeldin-ikon"><img src="/uploads/LOGOM.png" style="height:40px;object-fit:contain">
+                    </div>
+                    <h2>BOOM Chat'e Hoş Geldiniz!</h2>
+                    <p>Mesaj göndererek konuşmayı başlatın.</p>
+                </div>
+            </div>
+
+            <!-- AKIŞ ALANI -->
+            <div class="akis-alani" id="akisAlani" style="display:none">
+                <div class="akis-header">
+                    <div class="akis-baslik-row">
+                        <h2 class="akis-baslik-yazi">📡 Akış</h2>
+                        <button class="gonderi-ekle-btn" onclick="gonderiEkleModalAc()">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2.5">
+                                <line x1="12" y1="5" x2="12" y2="19" />
+                                <line x1="5" y1="12" x2="19" y2="12" />
+                            </svg>
+                            Paylaş
+                        </button>
+                    </div>
+                    <p class="akis-alt-yazi">Takip ettiğin kişilerin paylaşımları</p>
+                </div>
+                <div class="gonderi-listesi" id="gonderiListesiAna"></div>
+            </div>
+
+            <!-- KEŞFET ALANI -->
+            <div class="kesfet-alani" id="kesfetAlani" style="display:none">
+                <!-- STORY ÇUBUĞU -->
+                <div class="story-cubugu" id="storyCubugu">
+                    <div class="story-cubugu-icerik" id="storyCubuguIcerik">
+                        <div class="story-ekle-item" onclick="storyEkleModalAc()">
+                            <div class="story-ekle-halka">
+                                <div class="story-avatar-wrap">
+                                    <div class="story-avatar" id="kisiselStoryAvatar">+</div>
+                                    <div class="story-ekle-plus">+</div>
+                                </div>
+                            </div>
+                            <span class="story-ad">Story Ekle</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="akis-header" style="border-top:none">
+                    <div class="akis-baslik-row">
+                        <h2 class="akis-baslik-yazi">🔍 Keşfet</h2>
+                        <button class="gonderi-ekle-btn" onclick="gonderiEkleModalAc()">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2.5">
+                                <line x1="12" y1="5" x2="12" y2="19" />
+                                <line x1="5" y1="12" x2="19" y2="12" />
+                            </svg>
+                            Paylaş
+                        </button>
+                    </div>
+                    <p class="akis-alt-yazi">Tüm kullanıcıların paylaşımları</p>
+                </div>
+                <div class="gonderi-listesi" id="gonderiListesiKesfet"></div>
+            </div>
+
+            <!-- ========== YENİ: REELS ALANI ========== -->
+            <div class="reels-alani" id="reelsAlani" style="display:none">
+                <!-- Reels Yükle Butonu -->
+                <div class="reels-yukle-bar">
+                    <button class="gonderi-ekle-btn" onclick="reelsEkleModalAc()">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2.5">
+                            <line x1="12" y1="5" x2="12" y2="19" />
+                            <line x1="5" y1="12" x2="19" y2="12" />
+                        </svg>
+                        Reels Paylaş
+                    </button>
+                </div>
+                <!-- Reels Container: TikTok/Reels tarzı tam ekran dikey scroll -->
+                <div class="reels-container" id="reelsContainer">
+                    <!-- Reels itemlar buraya dinamik eklenir -->
+                </div>
+            </div>
+            <!-- ========== /REELS ALANI ========== -->
+
+            <div class="yaziyor-alan" id="yaziyorAlan"></div>
+
+            <!-- SOHBET FOOTER -->
+            <footer class="mesaj-footer" id="mesajFooter">
+                <div class="foto-onizleme-alan" id="fotoOnizlemeAlan" style="display:none">
+                    <div class="foto-onizleme-icerik">
+                        <img id="fotoOnizlemeImg" src="" alt="" style="display:none">
+                        <span id="fotoOnizlemeAd"
+                            style="font-size:13px;color:var(--t1);padding:6px 0;display:block"></span>
+                        <button class="foto-iptal-btn" onclick="fotoyuIptalEt()">✕</button>
+                    </div>
+                </div>
+                <div class="mesaj-input-sarici">
+                    <button class="foto-ekle-btn" id="fotoEkleBtn"
+                        onclick="document.getElementById('fotoInput').click()" disabled
+                        title="Dosya/Fotoğraf/Video ekle">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <path
+                                d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+                        </svg>
+                    </button>
+                    <input type="file" id="fotoInput" accept="image/*,video/*,.pdf,.doc,.docx,.zip,.txt" hidden>
+                    <textarea id="mesajInput" class="mesaj-input" placeholder="Bir mesaj yaz..." rows="1"
+                        disabled></textarea>
+                    <button class="gonder-btn" id="gonderBtn" onclick="mesajGonder()" disabled>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2.5">
+                            <line x1="22" y1="2" x2="11" y2="13" />
+                            <polygon points="22 2 15 22 11 13 2 9 22 2" />
+                        </svg>
+                    </button>
+                </div>
+            </footer>
+        </main>
+
+        <!-- SAĞ PANEL -->
+        <aside class="sag-panel" id="sagPanel" style="display:none">
+            <div id="sagPanelIcerik"></div>
+        </aside>
+    </div>
+
+    <!-- ========== MODALLER ========== -->
+
+    <!-- ADMİN PANELİ -->
+    <div class="modal-overlay" id="adminModal" style="display:none" onclick="modalKapat('adminModal')">
+        <div class="modal modal-genis" onclick="event.stopPropagation()">
+            <div class="modal-baslik">⚡ Admin Paneli</div>
+            <div id="adminPanelIcerik"></div>
+            <div class="modal-aksiyonlar">
+                <button class="modal-btn iptal" onclick="modalKapat('adminModal')">Kapat</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- BAN MODAL -->
+    <div class="modal-overlay" id="banModal" style="display:none" onclick="modalKapat('banModal')">
+        <div class="modal" onclick="event.stopPropagation()">
+            <div class="modal-baslik">🚫 Kullanıcıyı Banla</div>
+            <div class="form-alan">
+                <label class="form-etiket">BAN SEBEBİ</label>
+                <input type="text" id="banSebep" class="form-input" placeholder="Sebep yazın...">
             </div>
             <div class="form-alan">
-                <label class="form-etiket">ADMİN KODU <span class="opsiyonel">— adminseniz girin</span></label>
-                <input type="text" id="adminKodu" class="form-input" placeholder="Admin kodunuz (opsiyonel)"
-                    autocomplete="off" autocorrect="off">
+                <label class="form-etiket">SÜRE (Dakika — 0 = Süresiz)</label>
+                <input type="number" id="banSure" class="form-input" value="0" min="0">
             </div>
-            <div class="hata-kutu" id="kayitHata"></div>
-            <button class="giris-btn" id="kayitBtn" onclick="kayitOl()">
-                <span class="btn-yazi">KAYIT OL</span>
-                <span class="btn-ok">→</span>
-            </button>
+            <div class="modal-aksiyonlar">
+                <button class="modal-btn iptal" onclick="modalKapat('banModal')">İptal</button>
+                <button class="modal-btn tehlikeli" id="banOnayBtn">Banla</button>
+            </div>
         </div>
-
-        <p class="giris-not">Enter tuşuyla da devam edebilirsiniz</p>
     </div>
-</div>
 
-<!-- ========== SOHBET ========== -->
-<div class="ekran" id="sohbetEkrani">
-    <div class="sidebar-overlay" id="sidebarOverlay" onclick="sidebarKapat()"></div>
-
-    <!-- SIDEBAR -->
-    <aside class="sidebar" id="sidebar">
-        <div class="sidebar-ust">
-            <div class="sidebar-logo">
-                <span class="logo-ikon-kucuk">💥</span>
-                <span class="sidebar-baslik">BOOM</span>
+    <!-- YENİ ODA MODAL -->
+    <div class="modal-overlay" id="yeniOdaModal" style="display:none" onclick="modalKapat('yeniOdaModal')">
+        <div class="modal" onclick="event.stopPropagation()">
+            <div class="modal-baslik">➕ Yeni Oda Oluştur</div>
+            <div class="form-alan">
+                <label class="form-etiket">ODA ADI</label>
+                <input type="text" id="yeniOdaAdi" class="form-input" placeholder="oda-adi" maxlength="20"
+                    autocorrect="off" autocapitalize="off">
             </div>
-            <div style="display:flex;gap:3px">
-                <button class="ikon-btn" title="Tema" onclick="temaDegistir()">
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <circle cx="12" cy="12" r="5"/>
-                        <line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/>
-                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
-                        <line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/>
-                    </svg>
-                </button>
-                <button class="ikon-btn mobil-sidebar-kapat" onclick="sidebarKapat()">✕</button>
+            <div class="form-alan">
+                <label class="form-etiket">AÇIKLAMA</label>
+                <input type="text" id="yeniOdaAciklama" class="form-input" placeholder="Kısa açıklama...">
+            </div>
+            <div class="modal-aksiyonlar">
+                <button class="modal-btn iptal" onclick="modalKapat('yeniOdaModal')">İptal</button>
+                <button class="modal-btn onay" onclick="yeniOdaOlustur()">Oluştur</button>
             </div>
         </div>
+    </div>
 
-        <div class="sidebar-profil">
-            <div class="profil-avatar-kucuk" id="sidebarAvatar">?</div>
-            <div class="profil-bilgi">
-                <div class="profil-ad" id="sidebarAd">...</div>
-                <div class="profil-durum">
-                    <span class="online-nokta"></span>
-                    <span id="profilRol">Üye</span>
+    <!-- YENİ GRUP MODAL -->
+    <div class="modal-overlay" id="yeniGrupModal" style="display:none" onclick="modalKapat('yeniGrupModal')">
+        <div class="modal" onclick="event.stopPropagation()">
+            <div class="modal-baslik">👥 Yeni Grup Oluştur</div>
+            <div class="form-alan">
+                <label class="form-etiket">GRUP ADI</label>
+                <input type="text" id="yeniGrupAdi" class="form-input" placeholder="Grup adı...">
+            </div>
+            <div class="form-alan">
+                <label class="form-etiket">ÜYELER SEÇ</label>
+                <div id="grupUyeListesi"
+                    style="max-height:220px;overflow-y:auto;border:1px solid var(--kenar);border-radius:var(--r-md);padding:4px 8px;background:var(--bg-input2)">
                 </div>
             </div>
-            <button class="cikis-btn" onclick="cikisYap()" title="Çıkış">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
-                    <polyline points="16 17 21 12 16 7"/>
-                    <line x1="21" y1="12" x2="9" y2="12"/>
-                </svg>
-            </button>
-        </div>
-
-        <!-- ODALAR -->
-        <div class="sidebar-bolum">
-            <div class="bolum-baslik-satir">
-                <span class="bolum-baslik">ODALAR</span>
-                <button class="yeni-oda-btn admin-only" id="yeniOdaBtn" onclick="yeniOdaModalAc()" title="Yeni oda">+</button>
-            </div>
-            <div id="odaListesi"></div>
-        </div>
-
-        <!-- DM LİSTESİ -->
-        <div class="sidebar-bolum">
-            <div class="bolum-baslik">MESAJLAR</div>
-            <div class="dm-listesi" id="dmListesi"></div>
-        </div>
-
-        <!-- ÇEVRİMİÇİ -->
-        <div class="sidebar-bolum sidebar-bolum-flex">
-            <div class="bolum-baslik">ÇEVRİMİÇİ — <span id="kullaniciSayisi">0</span></div>
-            <div class="kullanici-listesi" id="kullaniciListesi"></div>
-        </div>
-    </aside>
-
-    <!-- ANA ALAN -->
-    <main class="ana-alan">
-        <header class="sohbet-header">
-            <button class="mobil-menu-btn" onclick="sidebarAc()">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <line x1="3" y1="6" x2="21" y2="6"/>
-                    <line x1="3" y1="12" x2="21" y2="12"/>
-                    <line x1="3" y1="18" x2="21" y2="18"/>
-                </svg>
-            </button>
-            <div class="header-baslik" id="headerBaslik">
-                <span class="header-ikon">#</span>
-                <span id="headerAd">genel</span>
-            </div>
-            <div class="header-aksiyonlar" id="headerAksiyonlar"></div>
-        </header>
-
-        <div class="mesaj-alani" id="mesajAlani">
-            <div class="hosgeldin-mesaji">
-                <div class="hosgeldin-ikon">💥</div>
-                <h2>BOOM Chat'e Hoş Geldiniz!</h2>
-                <p>Mesaj göndererek konuşmayı başlatın.</p>
+            <div class="modal-aksiyonlar">
+                <button class="modal-btn iptal" onclick="modalKapat('yeniGrupModal')">İptal</button>
+                <button class="modal-btn onay" onclick="yeniGrupOlustur()">Oluştur</button>
             </div>
         </div>
+    </div>
 
-        <div class="yaziyor-alan" id="yaziyorAlan"></div>
+    <!-- ENGEL MODAL -->
+    <div class="modal-overlay" id="engelModal" style="display:none" onclick="modalKapat('engelModal')">
+        <div class="modal" onclick="event.stopPropagation()">
+            <div class="modal-baslik">Kullanıcıyı Engelle</div>
+            <div class="modal-icerik" id="engelModalIcerik"></div>
+            <div class="modal-aksiyonlar">
+                <button class="modal-btn iptal" onclick="modalKapat('engelModal')">İptal</button>
+                <button class="modal-btn tehlikeli" id="engelOnayBtn">Engelle</button>
+            </div>
+        </div>
+    </div>
 
-        <footer class="mesaj-footer" id="mesajFooter">
-            <div class="foto-onizleme-alan" id="fotoOnizlemeAlan" style="display:none">
-                <div class="foto-onizleme-icerik">
-                    <img id="fotoOnizlemeImg" src="" alt="">
-                    <button class="foto-iptal-btn" onclick="fotoyuIptalEt()">✕</button>
+    <!-- GÖNDERİ EKLEME MODAL -->
+    <div class="modal-overlay" id="gonderiEkleModal" style="display:none" onclick="modalKapat('gonderiEkleModal')">
+        <div class="modal modal-genis" onclick="event.stopPropagation()">
+            <div class="modal-baslik">✍️ Yeni Gönderi</div>
+            <div class="gonderi-olustur-kart">
+                <div class="gonderi-olustur-avatar" id="gonderiOlusturAvatar">?</div>
+                <div style="flex:1">
+                    <textarea id="gonderiMetin" class="gonderi-textarea" placeholder="Ne düşünüyorsun?"></textarea>
                 </div>
             </div>
-            <div class="mesaj-input-sarici">
-                <button class="foto-ekle-btn" id="fotoEkleBtn"
-                    onclick="document.getElementById('fotoInput').click()" disabled>
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <rect x="3" y="3" width="18" height="18" rx="2"/>
-                        <circle cx="8.5" cy="8.5" r="1.5"/>
-                        <polyline points="21 15 16 10 5 21"/>
-                    </svg>
-                </button>
-                <input type="file" id="fotoInput" accept="image/*" hidden>
-                <textarea id="mesajInput" class="mesaj-input"
-                    placeholder="Bir mesaj yaz..." rows="1" disabled></textarea>
-                <button class="gonder-btn" id="gonderBtn" onclick="mesajGonder()" disabled>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                        <line x1="22" y1="2" x2="11" y2="13"/>
-                        <polygon points="22 2 15 22 11 13 2 9 22 2"/>
-                    </svg>
-                </button>
+            <div class="gonderi-medya-alan" id="gonderiMedyaOnizlemeAlan" style="display:none">
+                <div id="gonderiMedyaOnizleme"></div>
+                <button class="foto-iptal-btn" onclick="gonderiMedyaIptal()" style="top:6px;right:6px">✕</button>
             </div>
-        </footer>
-    </main>
-
-    <!-- SAĞ PANEL -->
-    <aside class="sag-panel" id="sagPanel" style="display:none">
-        <div id="sagPanelIcerik"></div>
-    </aside>
-</div>
-
-<!-- ADMİN PANELİ -->
-<div class="modal-overlay" id="adminModal" style="display:none" onclick="modalKapat('adminModal')">
-    <div class="modal modal-genis" onclick="event.stopPropagation()">
-        <div class="modal-baslik">⚡ Admin Paneli</div>
-        <div id="adminPanelIcerik"></div>
-        <div class="modal-aksiyonlar">
-            <button class="modal-btn iptal" onclick="modalKapat('adminModal')">Kapat</button>
+            <div class="gonderi-toolbar">
+                <button class="gonderi-toolbar-btn" onclick="document.getElementById('gonderiMedyaInput').click()">
+                    📷 Fotoğraf/Video
+                </button>
+                <input type="file" id="gonderiMedyaInput" accept="image/*,video/*" hidden>
+            </div>
+            <div class="modal-aksiyonlar">
+                <button class="modal-btn iptal" onclick="modalKapat('gonderiEkleModal')">İptal</button>
+                <button class="modal-btn onay" onclick="gonderiPaylas()" id="gonderiPaylasBtn">Paylaş</button>
+            </div>
         </div>
     </div>
-</div>
 
-<!-- BAN MODAL -->
-<div class="modal-overlay" id="banModal" style="display:none" onclick="modalKapat('banModal')">
-    <div class="modal" onclick="event.stopPropagation()">
-        <div class="modal-baslik">🚫 Kullanıcıyı Banla</div>
-        <div class="form-alan">
-            <label class="form-etiket">BAN SEBEBİ</label>
-            <input type="text" id="banSebep" class="form-input" placeholder="Sebep yazın...">
-        </div>
-        <div class="form-alan">
-            <label class="form-etiket">SÜRE (Dakika — 0 = Süresiz)</label>
-            <input type="number" id="banSure" class="form-input" value="0" min="0">
-        </div>
-        <div class="modal-aksiyonlar">
-            <button class="modal-btn iptal" onclick="modalKapat('banModal')">İptal</button>
-            <button class="modal-btn tehlikeli" id="banOnayBtn">Banla</button>
+    <!-- ========== YENİ: REELS EKLEME MODAL ========== -->
+    <div class="modal-overlay" id="reelsEkleModal" style="display:none" onclick="modalKapat('reelsEkleModal')">
+        <div class="modal modal-genis" onclick="event.stopPropagation()">
+            <div class="modal-baslik">🎬 Reels Paylaş</div>
+            <div class="reels-yukle-alan" id="reelsYukleAlan"
+                onclick="document.getElementById('reelsMedyaInput').click()">
+                <div id="reelsOnizleme" class="reels-onizleme-bos">
+                    <span style="font-size:48px;opacity:0.5">🎬</span>
+                    <span style="font-size:13px;color:var(--t3)">Video Seç (Dikey video önerilir)</span>
+                </div>
+            </div>
+            <input type="file" id="reelsMedyaInput" accept="video/*" hidden>
+            <div class="form-alan" style="margin-top:12px">
+                <label class="form-etiket">AÇIKLAMA (Opsiyonel)</label>
+                <input type="text" id="reelsAciklama" class="form-input" placeholder="Reels açıklaması...">
+            </div>
+            <div class="modal-aksiyonlar">
+                <button class="modal-btn iptal" onclick="modalKapat('reelsEkleModal')">İptal</button>
+                <button class="modal-btn onay" onclick="reelsPaylas()" id="reelsPaylasBtn">Paylaş</button>
+            </div>
         </div>
     </div>
-</div>
+    <!-- ========== /REELS MODAL ========== -->
 
-<!-- YENİ ODA MODAL -->
-<div class="modal-overlay" id="yeniOdaModal" style="display:none" onclick="modalKapat('yeniOdaModal')">
-    <div class="modal" onclick="event.stopPropagation()">
-        <div class="modal-baslik">➕ Yeni Oda Oluştur</div>
-        <div class="form-alan">
-            <label class="form-etiket">ODA ADI</label>
-            <input type="text" id="yeniOdaAdi" class="form-input" placeholder="oda-adi (küçük harf)"
-                maxlength="20" autocorrect="off" autocapitalize="off">
-        </div>
-        <div class="form-alan">
-            <label class="form-etiket">AÇIKLAMA</label>
-            <input type="text" id="yeniOdaAciklama" class="form-input" placeholder="Kısa açıklama...">
-        </div>
-        <div class="modal-aksiyonlar">
-            <button class="modal-btn iptal" onclick="modalKapat('yeniOdaModal')">İptal</button>
-            <button class="modal-btn onay" onclick="yeniOdaOlustur()">Oluştur</button>
+    <!-- STORY EKLEME MODAL -->
+    <div class="modal-overlay" id="storyEkleModal" style="display:none" onclick="modalKapat('storyEkleModal')">
+        <div class="modal modal-genis" onclick="event.stopPropagation()">
+            <div class="modal-baslik">📸 Story Ekle</div>
+            <div class="story-yukle-alan" id="storyYukleAlan"
+                onclick="document.getElementById('storyMedyaInput').click()">
+                <div id="storyOnizleme" class="story-onizleme-bos">
+                    <span class="story-yukle-ikon">📷</span>
+                    <span class="story-yukle-yazi">Fotoğraf veya Video Seç</span>
+                </div>
+            </div>
+            <input type="file" id="storyMedyaInput" accept="image/*,video/*" hidden>
+            <div class="form-alan" style="margin-top:12px">
+                <label class="form-etiket">METİN (Opsiyonel)</label>
+                <input type="text" id="storyMetin" class="form-input" placeholder="Story metnini girin...">
+            </div>
+            <div class="form-alan">
+                <label class="form-etiket">SÜRE</label>
+                <select id="storySure" class="form-input">
+                    <option value="3600">1 Saat</option>
+                    <option value="21600">6 Saat</option>
+                    <option value="43200">12 Saat</option>
+                    <option value="86400" selected>24 Saat</option>
+                </select>
+            </div>
+            <div class="modal-aksiyonlar">
+                <button class="modal-btn iptal" onclick="modalKapat('storyEkleModal')">İptal</button>
+                <button class="modal-btn onay" onclick="storyPaylas()" id="storyPaylasBtn">Paylaş</button>
+            </div>
         </div>
     </div>
-</div>
 
-<!-- ENGEL MODAL -->
-<div class="modal-overlay" id="engelModal" style="display:none" onclick="modalKapat('engelModal')">
-    <div class="modal" onclick="event.stopPropagation()">
-        <div class="modal-baslik">Kullanıcıyı Engelle</div>
-        <div class="modal-icerik" id="engelModalIcerik"></div>
-        <div class="modal-aksiyonlar">
-            <button class="modal-btn iptal" onclick="modalKapat('engelModal')">İptal</button>
-            <button class="modal-btn tehlikeli" id="engelOnayBtn">Engelle</button>
+    <!-- STORY İZLEME MODAL -->
+    <div class="story-viewer" id="storyViewer" style="display:none">
+        <div class="story-viewer-overlay" onclick="storyViewerKapat()"></div>
+        <div class="story-viewer-icerik">
+            <div class="story-progress-container" id="storyProgressContainer"></div>
+            <div class="story-viewer-header">
+                <div class="story-viewer-profil">
+                    <div class="story-viewer-avatar" id="storyViewerAvatar">?</div>
+                    <div>
+                        <div class="story-viewer-ad" id="storyViewerAd">...</div>
+                        <div class="story-viewer-zaman" id="storyViewerZaman">Az önce</div>
+                    </div>
+                </div>
+                <div class="story-viewer-aksiyonlar">
+                    <button class="story-sil-btn" id="storyViewerSilBtn" onclick="aktifStoryiSil()"
+                        style="display:none">🗑</button>
+                    <button class="story-viewer-kapat" onclick="storyViewerKapat()">✕</button>
+                </div>
+            </div>
+            <div class="story-viewer-medya" id="storyViewerMedya"></div>
+            <div class="story-viewer-metin" id="storyViewerMetin"></div>
+            <div class="story-nav-sol" onclick="storyOnceki()"></div>
+            <div class="story-nav-sag" onclick="storySonraki()"></div>
+            <div class="story-viewer-alt">
+                <div class="story-etkilesim">
+                    <button class="story-begen-btn" id="storyBegenBtn" onclick="storyBegenDegistir()">
+                        <span id="storyBegenIkon">🤍</span>
+                        <span id="storyBegenSayi">0</span>
+                    </button>
+                </div>
+                <div class="story-yorum-alan">
+                    <input type="text" id="storyYorumInput" class="story-yorum-input" placeholder="Yorum yaz...">
+                    <button class="story-yorum-gonder" onclick="storyYorumGonder()">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2.5">
+                            <line x1="22" y1="2" x2="11" y2="13" />
+                            <polygon points="22 2 15 22 11 13 2 9 22 2" />
+                        </svg>
+                    </button>
+                </div>
+            </div>
+            <div class="story-yorumlar" id="storyYorumlar"></div>
         </div>
     </div>
-</div>
 
-<!-- LİGHTBOX -->
-<div class="lightbox" id="lightbox" onclick="lightboxKapat()">
-    <div class="lightbox-icerik" onclick="event.stopPropagation()">
-        <img id="lightboxImg" src="" alt="">
-        <button class="lightbox-kapat" onclick="lightboxKapat()">✕</button>
+    <!-- PROFİL MODAL -->
+    <div class="modal-overlay" id="profilModal" style="display:none" onclick="modalKapat('profilModal')">
+        <div class="modal modal-genis" onclick="event.stopPropagation()">
+            <div id="profilModalIcerik"></div>
+            <div class="modal-aksiyonlar">
+                <button class="modal-btn iptal" onclick="modalKapat('profilModal')">Kapat</button>
+            </div>
+        </div>
     </div>
-</div>
 
-<div class="toast-kap" id="toastKap"></div>
+    <!-- YORUM MODAL -->
+    <div class="modal-overlay" id="yorumModal" style="display:none" onclick="modalKapat('yorumModal')">
+        <div class="modal modal-genis" onclick="event.stopPropagation()">
+            <div class="modal-baslik">💬 Yorumlar</div>
+            <div id="yorumModalIcerik" style="max-height:400px;overflow-y:auto;"></div>
+            <div class="form-alan" style="margin-top:12px;">
+                <textarea id="yorumMetin" class="form-input" rows="2" placeholder="Yorum yaz..."></textarea>
+            </div>
+            <div class="modal-aksiyonlar">
+                <button class="modal-btn iptal" onclick="modalKapat('yorumModal')">Kapat</button>
+                <button class="modal-btn onay" onclick="yorumGonder()">Yorum Yap</button>
+            </div>
+        </div>
+    </div>
 
-<script src="/socket.io/socket.io.js"></script>
-<script src="script.js"></script>
+    <!-- LİGHTBOX -->
+    <div class="lightbox" id="lightbox" onclick="lightboxKapat()">
+        <div class="lightbox-icerik" onclick="event.stopPropagation()">
+            <img id="lightboxImg" src="" alt="">
+            <button class="lightbox-kapat" onclick="lightboxKapat()">✕</button>
+        </div>
+    </div>
+
+    <div class="toast-kap" id="toastKap"></div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="script.js"></script>
 </body>
+
 </html>
