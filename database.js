@@ -1,4 +1,4 @@
-// ==================== BOOM CHAT v4 — database.js (DÜZELTİLMİŞ) ====================
+// ==================== BOOM CHAT v4 — database.js (IP BAN + GELİŞTİRMELER) ====================
 
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
@@ -105,7 +105,6 @@ async function sosyalTabloOlustur() {
         silindi      INTEGER DEFAULT 0
     )`);
 
-
     // ==================== STORY TABLOSU ====================
     await run(`CREATE TABLE IF NOT EXISTS storyler (
         id           INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -141,7 +140,6 @@ async function sosyalTabloOlustur() {
         metin        TEXT NOT NULL,
         olusturma    INTEGER DEFAULT (strftime('%s','now'))
     )`);
-
 }
 
 async function tablolariOlustur() {
@@ -203,6 +201,27 @@ async function tablolariOlustur() {
         olusturma    INTEGER DEFAULT (strftime('%s','now'))
     )`);
 
+    // ==================== IP BAN TABLOSU ====================
+    await run(`CREATE TABLE IF NOT EXISTS ip_banlar (
+        id           INTEGER PRIMARY KEY AUTOINCREMENT,
+        ip_adresi    TEXT NOT NULL,
+        admin_id     INTEGER NOT NULL,
+        sebep        TEXT DEFAULT '',
+        sure_dk      INTEGER DEFAULT 0,
+        bitis_zaman  INTEGER,
+        aktif        INTEGER DEFAULT 1,
+        olusturma    INTEGER DEFAULT (strftime('%s','now'))
+    )`);
+
+    // Kullanıcı IP kayıtları (hangi kullanıcı hangi IP'den bağlandı)
+    await run(`CREATE TABLE IF NOT EXISTS kullanici_ip_kayitlari (
+        id           INTEGER PRIMARY KEY AUTOINCREMENT,
+        kullanici_id INTEGER NOT NULL,
+        ip_adresi    TEXT NOT NULL,
+        son_baglanti INTEGER DEFAULT (strftime('%s','now')),
+        UNIQUE(kullanici_id, ip_adresi)
+    )`);
+
     await run(`CREATE TABLE IF NOT EXISTS gruplar (
         id          INTEGER PRIMARY KEY AUTOINCREMENT,
         ad          TEXT NOT NULL,
@@ -222,27 +241,28 @@ async function tablolariOlustur() {
     await run(`INSERT OR IGNORE INTO odalar (ad, aciklama) VALUES ('tanitim', 'Tanışma odası')`);
 
     await run(`CREATE TABLE IF NOT EXISTS bot_ayarlar (
-    id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    bot_id      INTEGER NOT NULL,
-    tip         TEXT NOT NULL,
-    aktif       INTEGER DEFAULT 1,
-    mesaj       TEXT DEFAULT '',
-    sure_dk     INTEGER DEFAULT 30,
-    odalar      TEXT DEFAULT '',
-    olusturma   INTEGER DEFAULT (strftime('%s','now'))
-)`);
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        bot_id      INTEGER NOT NULL,
+        tip         TEXT NOT NULL,
+        aktif       INTEGER DEFAULT 1,
+        mesaj       TEXT DEFAULT '',
+        sure_dk     INTEGER DEFAULT 30,
+        odalar      TEXT DEFAULT '',
+        olusturma   INTEGER DEFAULT (strftime('%s','now'))
+    )`);
 
     await run(`CREATE TABLE IF NOT EXISTS bot_konusmalar (
-    id           INTEGER PRIMARY KEY AUTOINCREMENT,
-    bot_id       INTEGER NOT NULL,
-    kullanici_id INTEGER NOT NULL,
-    mesaj        TEXT NOT NULL,
-    gonderen     TEXT NOT NULL,
-    zaman        INTEGER DEFAULT (strftime('%s','now'))
-)`);
+        id           INTEGER PRIMARY KEY AUTOINCREMENT,
+        bot_id       INTEGER NOT NULL,
+        kullanici_id INTEGER NOT NULL,
+        mesaj        TEXT NOT NULL,
+        gonderen     TEXT NOT NULL,
+        zaman        INTEGER DEFAULT (strftime('%s','now'))
+    )`);
+
     await sosyalTabloOlustur();
 
-    console.log('✅ Veritabanı hazır (v4 + Story + Reels Düzeltildi)');
+    console.log('✅ Veritabanı hazır (v4 + IP Ban + Story + Reels)');
 }
 
 tablolariOlustur().catch(console.error);
@@ -293,6 +313,8 @@ async function kullaniciSil(id) {
     await run('DELETE FROM kullanicilar WHERE id = ?', [id]);
     await run('DELETE FROM mesajlar WHERE gonderen_id = ?', [id]);
     await run('DELETE FROM banlar WHERE kullanici_id = ?', [id]);
+    await run('DELETE FROM ip_banlar WHERE admin_id = ?', [id]);
+    await run('DELETE FROM kullanici_ip_kayitlari WHERE kullanici_id = ?', [id]);
     await run('DELETE FROM grup_uyeler WHERE kullanici_id = ?', [id]);
     await run('DELETE FROM gonderiler WHERE kullanici_id = ?', [id]);
     await run('DELETE FROM yorumlar WHERE kullanici_id = ?', [id]);
@@ -322,6 +344,101 @@ async function profilGuncelle(id, avatarUrl, bio) {
     } else {
         await run('UPDATE kullanicilar SET bio = ? WHERE id = ?', [bio, id]);
     }
+}
+
+// ==================== IP YÖNETİMİ ====================
+
+// Kullanıcının IP'sini kaydet
+async function kullaniciIpKaydet(kullaniciId, ipAdresi) {
+    if (!ipAdresi || ipAdresi === '::1' || ipAdresi === '127.0.0.1') return; // localhost atla
+    try {
+        await run(`
+            INSERT INTO kullanici_ip_kayitlari (kullanici_id, ip_adresi, son_baglanti)
+            VALUES (?, ?, strftime('%s','now'))
+            ON CONFLICT(kullanici_id, ip_adresi) 
+            DO UPDATE SET son_baglanti = strftime('%s','now')
+        `, [kullaniciId, ipAdresi]);
+    } catch (e) {
+        // ON CONFLICT desteklenmiyorsa elle yap
+        try {
+            const mevcut = await get('SELECT id FROM kullanici_ip_kayitlari WHERE kullanici_id = ? AND ip_adresi = ?', [kullaniciId, ipAdresi]);
+            if (mevcut) {
+                await run('UPDATE kullanici_ip_kayitlari SET son_baglanti = strftime(\'%s\',\'now\') WHERE kullanici_id = ? AND ip_adresi = ?', [kullaniciId, ipAdresi]);
+            } else {
+                await run('INSERT INTO kullanici_ip_kayitlari (kullanici_id, ip_adresi) VALUES (?, ?)', [kullaniciId, ipAdresi]);
+            }
+        } catch (e2) { console.error('IP kayıt hatası:', e2); }
+    }
+}
+
+// IP banlı mı kontrol et
+async function ipBanliMi(ipAdresi) {
+    if (!ipAdresi || ipAdresi === '::1' || ipAdresi === '127.0.0.1') return null;
+    const now = Math.floor(Date.now() / 1000);
+    return await get(`
+        SELECT * FROM ip_banlar
+        WHERE ip_adresi = ? AND aktif = 1
+        AND (bitis_zaman IS NULL OR bitis_zaman > ?)
+    `, [ipAdresi, now]);
+}
+
+// IP banla
+async function ipBanla(ipAdresi, adminId, sebep, sureDk) {
+    // Önce aktif banı kaldır
+    await run('UPDATE ip_banlar SET aktif = 0 WHERE ip_adresi = ? AND aktif = 1', [ipAdresi]);
+    const bitisBefore = sureDk > 0 ? Math.floor(Date.now() / 1000) + (sureDk * 60) : null;
+    const result = await run(
+        `INSERT INTO ip_banlar (ip_adresi, admin_id, sebep, sure_dk, bitis_zaman) VALUES (?, ?, ?, ?, ?)`,
+        [ipAdresi, adminId, sebep || '', sureDk || 0, bitisBefore]
+    );
+    return result.lastID;
+}
+
+// IP ban kaldır
+async function ipBanKaldir(ipBanId) {
+    await run('UPDATE ip_banlar SET aktif = 0 WHERE id = ?', [ipBanId]);
+}
+
+// IP ban listesi
+async function ipBanListesi() {
+    const now = Math.floor(Date.now() / 1000);
+    return await all(`
+        SELECT ib.*, k.kullanici_adi as admin_adi
+        FROM ip_banlar ib
+        JOIN kullanicilar k ON ib.admin_id = k.id
+        WHERE ib.aktif = 1 AND (ib.bitis_zaman IS NULL OR ib.bitis_zaman > ?)
+        ORDER BY ib.olusturma DESC
+    `, [now]);
+}
+
+// Bir kullanıcının IP'lerini getir
+async function kullaniciIpleriGetir(kullaniciId) {
+    return await all(`
+        SELECT ip_adresi, son_baglanti FROM kullanici_ip_kayitlari
+        WHERE kullanici_id = ?
+        ORDER BY son_baglanti DESC
+    `, [kullaniciId]);
+}
+
+// Kullanıcıyı IP ile birlikte banla (hem hesap hem IP ban)
+async function kullaniciyiIPileBanla(kullaniciId, adminId, sebep, sureDk) {
+    // Önce normal hesap banı
+    await kullaniciBanla(kullaniciId, adminId, sebep, sureDk);
+
+    // Sonra tüm IP'lerini de banla
+    const ipler = await kullaniciIpleriGetir(kullaniciId);
+    const banliIpler = [];
+    for (const ipKayit of ipler) {
+        await ipBanla(ipKayit.ip_adresi, adminId, `Kullanıcı banı ile birlikte: ${sebep || ''}`, sureDk);
+        banliIpler.push(ipKayit.ip_adresi);
+    }
+    return banliIpler;
+}
+
+// Süresi biten IP banları temizle
+async function suresiBitenIpBanlariTemizle() {
+    const now = Math.floor(Date.now() / 1000);
+    await run('UPDATE ip_banlar SET aktif = 0 WHERE bitis_zaman IS NOT NULL AND bitis_zaman <= ?', [now]);
 }
 
 // ==================== ODALAR ====================
@@ -570,7 +687,6 @@ async function tumGonderileriGetir(kullaniciId, sayfa = 0, limit = 20) {
         LIMIT ? OFFSET ?
     `, [limit, sayfa * limit]);
 
-    // Beğeni durumunu da kontrol et
     for (let row of rows) {
         const begeniKontrol = await get(`SELECT 1 FROM begeniler WHERE gonderi_id = ? AND kullanici_id = ?`, [row.id, kullaniciId]);
         row.begenmisMi = !!begeniKontrol;
@@ -783,8 +899,6 @@ async function suresiBitenStoryleriTemizle() {
     await run(`UPDATE storyler SET silindi = 1 WHERE bitis <= ? AND silindi = 0`, [now]);
 }
 
-// ==================== DÜZELTME: Tüm aktif storyli kullanıcıları getir ====================
-// Artık sadece takip edilenleri değil, tüm aktif storyli kullanıcıları göster
 async function storyKullanicilariGetir(kullaniciId) {
     const now = Math.floor(Date.now() / 1000);
     const rows = await all(`
@@ -884,6 +998,7 @@ async function reelSil(reelId, kullaniciId, isAdmin = false) {
     await run(`UPDATE reels SET silindi = 1 WHERE id = ?`, [reelId]);
     return true;
 }
+
 async function kullaniciBul_ByAd(ad) {
     const k = await get('SELECT id, kullanici_adi, avatar_url, bio, rol FROM kullanicilar WHERE kullanici_adi = ? COLLATE NOCASE', [ad]);
     if (!k) return null;
@@ -924,6 +1039,7 @@ async function banSayisiGetir(kullaniciId) {
     const row = await get('SELECT COUNT(*) as sayi FROM banlar WHERE kullanici_id=?', [kullaniciId]);
     return row;
 }
+
 module.exports = {
     // Kullanici
     kullaniciKaydet, kullaniciGiris, kullaniciBul, tumKullanicilariGetir,
@@ -938,6 +1054,9 @@ module.exports = {
     grupUyesiMi, grupUyeEkle, grupUyeCikar, grupSil,
     // Ban
     kullaniciBanla, banKaldir, banliMi, banListesi, suresiBitenBanlariTemizle,
+    // IP Ban
+    kullaniciIpKaydet, ipBanliMi, ipBanla, ipBanKaldir, ipBanListesi,
+    kullaniciIpleriGetir, kullaniciyiIPileBanla, suresiBitenIpBanlariTemizle,
     // Sosyal Medya
     gonderiOlustur, gonderileriGetir, tumGonderileriGetir, gonderiBegen, gonderiBegenKaldir, gonderiSil,
     yorumEkle, yorumlariGetir, yorumSil,
