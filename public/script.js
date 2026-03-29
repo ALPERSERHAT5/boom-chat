@@ -222,6 +222,10 @@ function socketBaglan(token, kullanici) {
             const sebep = err.message.replace('BANLANDI:', '');
             alert('Hesabınız banlandı!\nSebep: ' + sebep);
             localStorage.removeItem('boom-token');
+        } else if (err.message.startsWith('IP_BANLANDI:')) {
+            const sebep = err.message.replace('IP_BANLANDI:', '');
+            alert('IP adresiniz banlandı!\nSebep: ' + sebep);
+            localStorage.removeItem('boom-token');
         } else {
             hataGoster('girisHata', 'Bağlantı hatası: ' + err.message);
             const btn = document.getElementById('girisBtn');
@@ -255,6 +259,22 @@ function socketBaglan(token, kullanici) {
         profilSidebarGuncelle();
         if (yeniRol === 'operator') { document.body.classList.add('yetkili'); toast('🛡 Operatör rolü verildi!'); }
     });
+    function _connectErrorHandler(err) {
+        if (err.message.startsWith('BANLANDI:')) {
+            const sebep = err.message.replace('BANLANDI:', '');
+            alert('Hesabınız banlandı!\nSebep: ' + sebep);
+            localStorage.removeItem('boom-token');
+        } else if (err.message.startsWith('IP_BANLANDI:')) {
+            const sebep = err.message.replace('IP_BANLANDI:', '');
+            alert('⛔ IP adresiniz banlandı!\nSebep: ' + (sebep || 'Belirtilmedi') + '\n\nFarklı bir hesap açsanız dahi giriş yapamazsınız.');
+            localStorage.removeItem('boom-token');
+            document.getElementById('girisHata').textContent = '⛔ Bu IP adresi banlanmıştır!';
+        } else {
+            hataGoster('girisHata', 'Bağlantı hatası: ' + err.message);
+            const btn = document.getElementById('girisBtn');
+            if (btn) { btn.disabled = false; btn.querySelector('.btn-yazi').textContent = 'GİRİŞ YAP'; }
+        }
+    }
 
     socketOlaylariKur();
 }
@@ -266,6 +286,8 @@ function socketOlaylariKur() {
         odalar = liste;
         odalariRender();
         if (liste.length > 0 && !aktifOda) odaGir(liste[0].ad);
+        socket.on('admin-ip-ban-listesi', (liste) => adminIpBanListesiGoster(liste));
+        socket.on('admin-kullanici-ipler', ({ kullaniciId, ipler }) => adminKullaniciIplerGoster(kullaniciId, ipler));
     });
 
     socket.on('yeni-oda', (oda) => { odalar.push(oda); odalariRender(); toast('🆕 Yeni oda: #' + oda.ad); });
@@ -1521,12 +1543,14 @@ async function adminPanelAc() {
 function adminPanelRender(liste) {
     const aktifOnline = Object.values(kullanicilar);
     let html = `
-    <div class="admin-sekmeler" style="display:flex;gap:0;margin-bottom:16px;background:var(--bg-input2);border-radius:var(--r-md);padding:3px;border:1px solid var(--kenar)">
-        <button class="admin-sekme aktif" onclick="adminSekme('kullanicilar', this)" style="flex:1;padding:7px;border:none;background:var(--mavi);color:white;border-radius:calc(var(--r-md) - 2px);cursor:pointer;font-size:12px;font-weight:600">👥 Kullanıcılar (${liste.length})</button>
-        <button class="admin-sekme" onclick="adminSekme('online', this)" style="flex:1;padding:7px;border:none;background:transparent;color:var(--t2);border-radius:calc(var(--r-md) - 2px);cursor:pointer;font-size:12px;font-weight:600">🟢 Online (${aktifOnline.length})</button>
-        <button class="admin-sekme" onclick="adminSekme('banlar', this)" style="flex:1;padding:7px;border:none;background:transparent;color:var(--t2);border-radius:calc(var(--r-md) - 2px);cursor:pointer;font-size:12px;font-weight:600">🚫 Banlar</button>
-        <button class="admin-sekme" onclick="adminSekme('botlar', this)" style="flex:1;padding:7px;border:none;background:transparent;color:var(--t2);border-radius:calc(var(--r-md) - 2px);cursor:pointer;font-size:12px;font-weight:600">🤖 Botlar</button>
+    <div class="admin-sekmeler" style="display:flex;gap:0;margin-bottom:16px;background:var(--bg-input2);border-radius:var(--r-md);padding:3px;border:1px solid var(--kenar);flex-wrap:wrap">
+        <button class="admin-sekme aktif" onclick="adminSekme('kullanicilar', this)" style="flex:1;min-width:80px;padding:7px;border:none;background:var(--mavi);color:white;border-radius:calc(var(--r-md) - 2px);cursor:pointer;font-size:11px;font-weight:600">👥 Kullanıcılar (${liste.length})</button>
+        <button class="admin-sekme" onclick="adminSekme('online', this)" style="flex:1;min-width:80px;padding:7px;border:none;background:transparent;color:var(--t2);border-radius:calc(var(--r-md) - 2px);cursor:pointer;font-size:11px;font-weight:600">🟢 Online (${aktifOnline.length})</button>
+        <button class="admin-sekme" onclick="adminSekme('banlar', this)" style="flex:1;min-width:80px;padding:7px;border:none;background:transparent;color:var(--t2);border-radius:calc(var(--r-md) - 2px);cursor:pointer;font-size:11px;font-weight:600">🚫 Banlar</button>
+        <button class="admin-sekme" onclick="adminSekme('ipbanlar', this)" style="flex:1;min-width:80px;padding:7px;border:none;background:transparent;color:var(--t2);border-radius:calc(var(--r-md) - 2px);cursor:pointer;font-size:11px;font-weight:600">🌐 IP Ban</button>
+        <button class="admin-sekme" onclick="adminSekme('botlar', this)" style="flex:1;min-width:80px;padding:7px;border:none;background:transparent;color:var(--t2);border-radius:calc(var(--r-md) - 2px);cursor:pointer;font-size:11px;font-weight:600">🤖 Botlar</button>
     </div>
+ 
     <div id="adminSekme-kullanicilar">
         <input type="text" oninput="adminAra(this.value)" placeholder="🔍 Kullanıcı ara..." class="form-input" style="margin-bottom:10px;font-size:13px">
         <div id="adminKullaniciListe" style="max-height:380px;overflow-y:auto">`;
@@ -1548,13 +1572,13 @@ function adminPanelRender(liste) {
             </div>
             <div style="display:flex;gap:4px;flex-shrink:0;flex-wrap:wrap;justify-content:flex-end">
                 ${k.id !== ben.id ? `
-               <select onchange="adminRolDegistir(${k.id}, this.value)" ...>
+                <select onchange="adminRolDegistir(${k.id}, this.value)" style="padding:4px;background:var(--bg-input2);border:1px solid var(--kenar);border-radius:var(--r-sm);color:var(--t1);font-size:11px">
                     <option value="uye" ${k.rol === 'uye' ? 'selected' : ''}>Üye</option>
                     <option value="operator" ${k.rol === 'operator' ? 'selected' : ''}>Operatör</option>
                     <option value="bot" ${k.rol === 'bot' ? 'selected' : ''}>Bot</option>
                     <option value="admin" ${k.rol === 'admin' ? 'selected' : ''}>Admin</option>
                 </select>
-
+                <button class="admin-btn mavi" onclick="adminKullaniciIplerGoster_modal(${k.id}, '${esc(k.kullanici_adi)}')" title="IP'leri Gör">🌐</button>
                 <button class="admin-btn mavi" onclick="adminSifreSifirla(${k.id}, '${esc(k.kullanici_adi)}')">🔑</button>
                 ${k.banli
                     ? `<button class="admin-btn yesil" onclick="socket.emit('admin-ban-kaldir',${k.id});adminPanelAc()">✅</button>`
@@ -1566,6 +1590,7 @@ function adminPanelRender(liste) {
     });
 
     html += `</div></div>
+ 
     <div id="adminSekme-online" style="display:none"><div style="max-height:380px;overflow-y:auto">`;
     if (aktifOnline.length === 0) {
         html += '<p style="font-size:12px;color:var(--t3);text-align:center;padding:20px">Başka online kullanıcı yok</p>';
@@ -1578,36 +1603,173 @@ function adminPanelRender(liste) {
         });
     }
     html += `</div></div>
+ 
     <div id="adminSekme-banlar" style="display:none">
         <button class="admin-btn mavi" onclick="socket.emit('admin-ban-listesi-iste')" style="margin-bottom:8px">Listeyi Yükle</button>
         <div id="adminBanListesi" style="max-height:380px;overflow-y:auto"></div>
+    </div>
+ 
+    <!-- ==================== IP BAN SEKMESİ ==================== -->
+    <div id="adminSekme-ipbanlar" style="display:none;padding:4px 0">
+        <div style="font-size:13px;font-weight:600;margin-bottom:10px;color:var(--t1)">🌐 IP Ban Yönetimi</div>
+        
+        <!-- Manuel IP Ban Formu -->
+        <div style="background:var(--bg-input2);border:1px solid var(--kenar);border-radius:var(--r-lg);padding:12px;margin-bottom:12px">
+            <div style="font-size:12px;font-weight:600;color:var(--t2);margin-bottom:8px">Yeni IP Banla</div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+                <input type="text" id="manuelIpAdresi" class="form-input" placeholder="IP Adresi (örn: 192.168.1.1)" style="flex:1;min-width:140px;font-size:13px">
+                <input type="text" id="manuelIpSebep" class="form-input" placeholder="Sebep" style="flex:1;min-width:120px;font-size:13px">
+                <input type="number" id="manuelIpSure" class="form-input" placeholder="Süre (dk, 0=kalıcı)" value="0" min="0" style="width:80px;font-size:13px">
+            </div>
+            <button class="modal-btn tehlikeli" onclick="manuelIpBanla()" style="margin-top:8px;width:100%">🌐 IP'yi Banla</button>
+        </div>
+ 
+        <!-- Aktif IP Banlar Listesi -->
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+            <span style="font-size:12px;font-weight:600;color:var(--t2)">Aktif IP Banlar</span>
+            <button class="admin-btn mavi" onclick="socket.emit('admin-ip-ban-listesi-iste')" style="font-size:11px">🔄 Yenile</button>
+        </div>
+        <div id="adminIpBanListesi" style="max-height:280px;overflow-y:auto">
+            <p style="font-size:12px;color:var(--t3);text-align:center;padding:16px">"Yenile" butonuna bas listei gör</p>
+        </div>
+    </div>
+    <!-- ==================== /IP BAN SEKMESİ ==================== -->
+ 
+    <div id="adminSekme-botlar" style="display:none;padding:4px 0">
+        <div style="font-size:13px;font-weight:600;margin-bottom:10px;color:var(--t1)">📢 Sarı Bot — Reklam Mesajı</div>
+        <textarea id="sariBotMesaj" class="form-input" rows="3" placeholder="Reklam mesajını yaz..." style="width:100%;resize:none;margin-bottom:8px;font-family:inherit"></textarea>
+        <div style="display:flex;gap:8px;margin-bottom:8px;align-items:flex-end">
+            <div style="flex:1">
+                <label class="form-etiket">ARALIK (Dakika)</label>
+                <input type="number" id="sariBotSure" class="form-input" value="30" min="1" style="font-size:13px">
+            </div>
+        </div>
+        <div style="margin-bottom:10px">
+            <label class="form-etiket">ODALAR</label>
+            <div style="display:flex;flex-wrap:wrap;gap:6px;padding:8px;background:var(--bg-input2);border:1px solid var(--kenar);border-radius:var(--r-md)">
+                ${odalar.map(o => `
+                    <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;padding:4px 8px;background:var(--bg-hover);border-radius:var(--r-sm)">
+                        <input type="checkbox" value="${esc(o.ad)}" style="width:13px;height:13px"> #${esc(o.ad)}
+                    </label>`).join('')}
+            </div>
+        </div>
+        <div style="display:flex;gap:8px">
+            <button class="modal-btn onay" onclick="sariBotBaslat()" style="flex:1">▶ Başlat</button>
+            <button class="modal-btn tehlikeli" onclick="sariBotDurdur()" style="flex:1">⏹ Durdur</button>
+        </div>
     </div>`;
-    html += `
-<div id="adminSekme-botlar" style="display:none;padding:4px 0">
-    <div style="font-size:13px;font-weight:600;margin-bottom:10px;color:var(--t1)">📢 Sarı Bot — Reklam Mesajı</div>
-    <textarea id="sariBotMesaj" class="form-input" rows="3" placeholder="Reklam mesajını yaz..." style="width:100%;resize:none;margin-bottom:8px;font-family:inherit"></textarea>
-    <div style="display:flex;gap:8px;margin-bottom:8px;align-items:flex-end">
-        <div style="flex:1">
-            <label class="form-etiket">ARALIK (Dakika)</label>
-            <input type="number" id="sariBotSure" class="form-input" value="30" min="1" style="font-size:13px">
-        </div>
-    </div>
-    <div style="margin-bottom:10px">
-        <label class="form-etiket">ODALAR</label>
-        <div style="display:flex;flex-wrap:wrap;gap:6px;padding:8px;background:var(--bg-input2);border:1px solid var(--kenar);border-radius:var(--r-md)">
-            ${odalar.map(o => `
-                <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;padding:4px 8px;background:var(--bg-hover);border-radius:var(--r-sm)">
-                    <input type="checkbox" value="${esc(o.ad)}" style="width:13px;height:13px"> #${esc(o.ad)}
-                </label>`).join('')}
-        </div>
-    </div>
-    <div style="display:flex;gap:8px">
-        <button class="modal-btn onay" onclick="sariBotBaslat()" style="flex:1">▶ Başlat</button>
-        <button class="modal-btn tehlikeli" onclick="sariBotDurdur()" style="flex:1">⏹ Durdur</button>
-    </div>
-</div>`;
 
     document.getElementById('adminPanelIcerik').innerHTML = html;
+
+    // IP ban olaylarını dinle
+    socket.off('admin-ip-ban-listesi');
+    socket.on('admin-ip-ban-listesi', (liste) => adminIpBanListesiGoster(liste));
+    socket.off('admin-kullanici-ipler');
+    socket.on('admin-kullanici-ipler', ({ kullaniciId, ipler }) => {
+        // Bu event geldiğinde toast ile göster
+        adminKullaniciIplerToast(kullaniciId, ipler);
+    });
+}
+
+// IP Ban liste render
+function adminIpBanListesiGoster(liste) {
+    const el = document.getElementById('adminIpBanListesi');
+    if (!el) return;
+    if (!liste || liste.length === 0) {
+        el.innerHTML = '<p style="font-size:12px;color:var(--t3);text-align:center;padding:16px">Aktif IP ban yok 🎉</p>';
+        return;
+    }
+    el.innerHTML = liste.map(b => {
+        const kalan = b.bitis_zaman
+            ? Math.ceil((b.bitis_zaman - Math.floor(Date.now() / 1000)) / 60) + ' dk kaldı'
+            : 'Kalıcı';
+        return `
+        <div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--kenar);flex-wrap:wrap">
+            <div style="flex:1;min-width:0">
+                <div style="font-size:13px;font-weight:600;font-family:monospace;color:var(--kirmizi)">${esc(b.ip_adresi)}</div>
+                <div style="font-size:10px;color:var(--t3)">${esc(b.sebep || 'Sebepsiz')} · ${kalan} · Admin: ${esc(b.admin_adi)}</div>
+            </div>
+            <button class="admin-btn yesil" onclick="socket.emit('admin-ip-ban-kaldir', ${b.id}); this.closest('div').remove();">✅ Kaldır</button>
+        </div>`;
+    }).join('');
+}
+
+// Manuel IP ban
+function manuelIpBanla() {
+    const ip = document.getElementById('manuelIpAdresi')?.value.trim();
+    const sebep = document.getElementById('manuelIpSebep')?.value.trim();
+    const sure = parseInt(document.getElementById('manuelIpSure')?.value) || 0;
+    if (!ip) { toast('IP adresi girin!', 'hata'); return; }
+    socket.emit('admin-ip-banla', { ipAdresi: ip, sebep, sureDk: sure });
+    toast(`🌐 ${ip} banlanıyor...`);
+    document.getElementById('manuelIpAdresi').value = '';
+    document.getElementById('manuelIpSebep').value = '';
+    // Listeyi güncelle
+    setTimeout(() => socket.emit('admin-ip-ban-listesi-iste'), 500);
+}
+
+// Kullanıcı IP'lerini modal ile göster
+function adminKullaniciIplerGoster_modal(kullaniciId, kullaniciAdi) {
+    socket.emit('admin-kullanici-ipler-iste', kullaniciId);
+    toast(`🌐 ${kullaniciAdi}'nın IP'leri yükleniyor...`);
+}
+
+// IP'leri toast/overlay olarak göster
+function adminKullaniciIplerToast(kullaniciId, ipler) {
+    if (!ipler || ipler.length === 0) {
+        toast('Bu kullanıcı için IP kaydı yok.', 'bilgi');
+        return;
+    }
+
+    // Basit bir overlay/modal ile göster
+    const mevcutOverlay = document.getElementById('iplerOverlay');
+    if (mevcutOverlay) mevcutOverlay.remove();
+
+    const overlay = document.createElement('div');
+    overlay.id = 'iplerOverlay';
+    overlay.style.cssText = `
+        position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:2000;
+        display:flex;align-items:center;justify-content:center;padding:16px
+    `;
+
+    overlay.innerHTML = `
+        <div style="background:var(--bg-panel);border:1px solid var(--kenar2);border-radius:var(--r-xl);padding:20px;max-width:400px;width:100%;max-height:80vh;overflow-y:auto">
+            <div style="font-size:15px;font-weight:700;margin-bottom:12px">🌐 Kullanıcı IP Adresleri</div>
+            ${ipler.map(ip => `
+                <div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--kenar)">
+                    <code style="flex:1;font-size:13px;color:var(--mavi2)">${esc(ip.ip_adresi)}</code>
+                    <span style="font-size:10px;color:var(--t3)">${new Date(ip.son_baglanti * 1000).toLocaleDateString('tr-TR')}</span>
+                    <button class="admin-btn ban" onclick="hizliIpBanla('${esc(ip.ip_adresi)}')" style="font-size:10px">⛔ Ban</button>
+                </div>
+            `).join('')}
+            <button class="modal-btn iptal" onclick="this.closest('#iplerOverlay').remove()" style="width:100%;margin-top:12px">Kapat</button>
+        </div>`;
+
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+    document.body.appendChild(overlay);
+}
+
+// Hızlı IP ban (overlay içinden)
+function hizliIpBanla(ipAdresi) {
+    if (!confirm(`"${ipAdresi}" IP'sini kalıcı olarak banlamak istiyor musunuz?`)) return;
+    socket.emit('admin-ip-banla', { ipAdresi, sebep: 'Admin tarafından banlandı', sureDk: 0 });
+    toast(`🌐 ${ipAdresi} banlandı!`);
+    document.getElementById('iplerOverlay')?.remove();
+}
+
+// adminSekme fonksiyonunu güncelle (ipbanlar sekmesini destekle)
+function adminSekme(id, btn) {
+    document.querySelectorAll('.admin-sekme').forEach(b => { b.style.background = 'transparent'; b.style.color = 'var(--t2)'; });
+    btn.style.background = 'var(--mavi)'; btn.style.color = 'white';
+    ['kullanicilar', 'online', 'banlar', 'ipbanlar', 'botlar'].forEach(s => {
+        const el = document.getElementById('adminSekme-' + s);
+        if (el) el.style.display = s === id ? 'block' : 'none';
+    });
+
+    // IP ban sekmesi açıldığında otomatik yükle
+    if (id === 'ipbanlar') {
+        setTimeout(() => socket.emit('admin-ip-ban-listesi-iste'), 100);
+    }
 }
 
 function adminSekme(id, btn) {
@@ -1713,10 +1875,29 @@ function engelKaldir(hedefId) { socket.emit('engel-kaldir', hedefId); }
 function banModalAc(hedefId) {
     document.getElementById('banSebep').value = '';
     document.getElementById('banSure').value = '0';
+
+    // IP ban checkbox'ı ekle
+    const modalEl = document.getElementById('banModal');
+    const mevcut = modalEl.querySelector('.ip-ban-secim');
+    if (!mevcut) {
+        const ipBanDiv = document.createElement('div');
+        ipBanDiv.className = 'form-alan ip-ban-secim';
+        ipBanDiv.innerHTML = `
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:8px 0">
+                <input type="checkbox" id="ipBanDaCheckbox" style="width:16px;height:16px;cursor:pointer">
+                <span style="font-size:13px;color:var(--t1)">🌐 IP adresini de banla <span style="color:var(--kirmizi);font-size:11px">(Farklı hesapla da giremez)</span></span>
+            </label>`;
+        const aksiyonlar = modalEl.querySelector('.modal-aksiyonlar');
+        modalEl.querySelector('.modal').insertBefore(ipBanDiv, aksiyonlar);
+    } else {
+        document.getElementById('ipBanDaCheckbox').checked = false;
+    }
+
     document.getElementById('banOnayBtn').onclick = () => {
         const sebep = document.getElementById('banSebep').value.trim();
         const sure = parseInt(document.getElementById('banSure').value) || 0;
-        socket.emit('admin-banla', { hedefId: parseInt(hedefId), sebep, sureDk: sure });
+        const ipBanDa = document.getElementById('ipBanDaCheckbox')?.checked || false;
+        socket.emit('admin-banla', { hedefId: parseInt(hedefId), sebep, sureDk: sure, ipBanDa });
         modalKapat('banModal');
     };
     document.getElementById('banModal').style.display = 'flex';
@@ -2795,7 +2976,41 @@ function sariBotDurdur() {
     socket.emit('sari-bot-durdur');
 }
 
-// Botları DM listesine ekle
+// ==================== BOOM CHAT — SAAT DÜZELTMESİ (script.js'e entegre edilecek) ====================
+// 
+// script.js dosyanızda aşağıdaki değişiklikleri yapın:
+//
+// 1) "zamanFarki" fonksiyonu aynı kalabilir (Unix timestamp farkı — doğru çalışıyor)
+//
+// 2) Mesaj gönderiminde "zaman" alanını sunucu tarafında üretiyoruz (server.js'deki zamanStr)
+//    Bu sayede Türkiye saati otomatik uygulanıyor.
+//
+// 3) Script.js'deki mesaj gönderi kısmında client-side zaman üretimi varsa kaldırın.
+//    Zaman artık server.js'den geliyor — Türkiye saatiyle (UTC+3).
+//
+// 4) @mavibot mention desteği: Kullanıcılar oda/grup chat'te "@mavibot [soru]" yazabilir.
+//    Bu özellik server.js'de aktif — script.js'de ekstra değişiklik gerekmez.
+//
+// ====================================================================================
+// 
+// KURULUM NOTU — ANTHROPIC_API_KEY:
+// 
+// Claude AI ile gerçek yapay zeka için:
+// 1. https://console.anthropic.com adresine gidin
+// 2. API key alın (ücretsiz $5 kredi veriliyor)
+// 3. Sunucunuzda:
+//    Linux/Mac: export ANTHROPIC_API_KEY="sk-ant-xxxxx"
+//    Windows:   set ANTHROPIC_API_KEY=sk-ant-xxxxx
+//    .env dosyası: ANTHROPIC_API_KEY=sk-ant-xxxxx
+// 
+// API key olmadan da çalışır — gelişmiş kural tabanlı yedek sistem devreye girer.
+// 
+// ====================================================================================
+
+// Bu dosyayı script.js'inizin mevcut zamanFarki fonksiyonuyla değiştirin:
+// (Zaten doğru çalışıyor, sunucu saati Türkiye saatiyle gönderilecek)
+
+// Aşağıdaki fonksiyonu script.js'inizin "botlariListeyeEkle" fonksiyonuyla değiştirin:
 function botlariListeyeEkle() {
     const botlar = [
         { id: -1, ad: 'mavibot', avatarUrl: null, rol: 'bot' },
@@ -2811,5 +3026,58 @@ function botlariListeyeEkle() {
     });
 }
 
+// Mesaj input'una @mavibot otomatik tamamlama ipucu ekle (opsiyonel):
+// input.placeholder yerine hint göstermek istiyorsanız aşağıdaki kodu kullanabilirsiniz:
+function maviботHintEkle() {
+    const input = document.getElementById('mesajInput');
+    if (!input) return;
+
+    input.addEventListener('input', function () {
+        const val = this.value;
+        if (val === '@m' || val === '@ma' || val === '@mav') {
+            // Küçük bir hint tooltip göster
+            const hint = document.getElementById('mavibot-hint') || (() => {
+                const h = document.createElement('div');
+                h.id = 'mavibot-hint';
+                h.style.cssText = `
+                    position: absolute;
+                    bottom: 100%;
+                    left: 0;
+                    background: var(--bg-panel);
+                    border: 1px solid var(--mavi-brd);
+                    border-radius: var(--r-md);
+                    padding: 8px 12px;
+                    font-size: 12px;
+                    color: var(--mavi2);
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                    z-index: 100;
+                    cursor: pointer;
+                    white-space: nowrap;
+                `;
+                h.innerHTML = '🔵 <strong>@mavibot</strong> — AI asistan';
+                h.onclick = () => { input.value = '@mavibot '; input.focus(); h.remove(); };
+                input.parentElement.style.position = 'relative';
+                input.parentElement.appendChild(h);
+                return h;
+            })();
+        } else {
+            document.getElementById('mavibot-hint')?.remove();
+        }
+    });
+
+    // Input odak kaybedince hint kaldır
+    input.addEventListener('blur', () => {
+        setTimeout(() => document.getElementById('mavibot-hint')?.remove(), 200);
+    });
+}
+
+// Sayfa yüklenince çalıştır
+document.addEventListener('DOMContentLoaded', () => {
+    setTimeout(botlariListeyeEkle, 3000);
+    // Uncomment aşağıdaki satırı @mavibot hint için:
+    // maviботHintEkle();
+});
 // Sayfa yüklendikten sonra çalıştır
 setTimeout(botlariListeyeEkle, 3000);
