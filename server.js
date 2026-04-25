@@ -1,4 +1,23 @@
 // ==================== BOOM CHAT v4 — server.js (IP BAN + GELİŞMİŞ MAVİ BOT) ====================
+// Başa ekle:
+const path = require('path');
+const DB_PATH = '/tmp/boom-chat.db';  // Render için ÖZEL!
+
+const db = new sqlite3.Database(DB_PATH);
+
+console.log('🚀 SERVER STARTING...');
+console.log('Current directory:', __dirname);
+console.log('Files in directory:', require('fs').readdirSync(__dirname));
+
+// Bot kontrol
+try {
+    const MaviBot = require('./mavibot');
+    console.log('✅ MAVIBOT LOADED SUCCESSFULLY!');
+    console.log('Bot type:', typeof MaviBot.cevapla);
+} catch(e) {
+    console.log('❌ MAVIBOT ERROR:', e.message);
+}
+
 const MaviBot = require('./mavibot');
 const express = require('express');
 const app = express();
