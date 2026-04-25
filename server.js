@@ -1,6 +1,5 @@
 // ==================== BOOM CHAT v4 — server.js (IP BAN + GELİŞMİŞ MAVİ BOT) ====================
 // Başa ekle:
-const path = require('path');
 const DB_PATH = '/tmp/boom-chat.db';  // Render için ÖZEL!
 
 const db = new sqlite3.Database(DB_PATH);
@@ -28,7 +27,7 @@ const multer = require('multer');
 const { v4: uuidv4 } = require('uuid');
 const fs = require('fs');
 const jwt = require('jsonwebtoken');
-const db = require('./database');
+//const db = require('./database');
 
 // ==================== TÜRKİYE SAATİ YARDIMCISI ====================
 function zamanStr() {
