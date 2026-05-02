@@ -1040,6 +1040,40 @@ async function banSayisiGetir(kullaniciId) {
     return row;
 }
 
+// ==================== DATABASE.JS'E EKLENECEK FONKSİYONLAR ====================
+// Bu fonksiyonları database.js'in sonuna, module.exports'tan ÖNCE ekle.
+// Sonra module.exports objesine de ekle (aşağıda gösterildi).
+
+async function tumMesajlariSil() {
+    await run('DELETE FROM mesajlar');
+}
+
+async function tumGonderileriSil() {
+    await run('DELETE FROM gonderiler');
+    await run('DELETE FROM begeniler');
+    await run('DELETE FROM yorumlar');
+}
+
+async function tumReelsSil() {
+    await run('DELETE FROM reels');
+    await run('DELETE FROM reel_begeniler');
+    await run('DELETE FROM reel_yorumlar');
+}
+
+async function tumStorileriSil() {
+    await run('DELETE FROM storyler');
+    await run('DELETE FROM story_goruntulemeler');
+    await run('DELETE FROM story_begeniler');
+    await run('DELETE FROM story_yorumlar');
+}
+
+async function tumBanlariSil() {
+    await run('DELETE FROM banlar');
+    await run('DELETE FROM ip_banlar');
+}
+
+// module.exports objesine şunları ekle:
+// tumMesajlariSil, tumGonderileriSil, tumReelsSil, tumStorileriSil, tumBanlariSil
 module.exports = {
     // Kullanici
     kullaniciKaydet, kullaniciGiris, kullaniciBul, tumKullanicilariGetir,
@@ -1070,5 +1104,7 @@ module.exports = {
     reelYorumEkle, reelYorumlariGetir, reelYorumSil, reelSil,
     // Bot
     kullaniciBul_ByAd, botAyarGetir, botAyarKaydet, botAyarDurdur,
-    botKonusmaKaydet, botKonusmaGetir, banSayisiGetir
+    botKonusmaKaydet, botKonusmaGetir, banSayisiGetir,
+
+    tumMesajlariSil, tumGonderileriSil, tumReelsSil, tumStorileriSil, tumBanlariSil
 };
