@@ -370,7 +370,7 @@
     <!-- ========== MODALLER ========== -->
 
     <!-- ADMİN PANELİ -->
-    <div class="modal-overlay" id="adminModal" style="display:none" onclick="modalKapat('adminModal')">
+    <!-- <div class="modal-overlay" id="adminModal" style="display:none" onclick="modalKapat('adminModal')">
         <div class="modal modal-genis" onclick="event.stopPropagation()">
             <div class="modal-baslik">⚡ Admin Paneli</div>
             <div id="adminPanelIcerik"></div>
@@ -378,7 +378,48 @@
                 <button class="modal-btn iptal" onclick="modalKapat('adminModal')">Kapat</button>
             </div>
         </div>
+    </div> -->
+    <!-- ADMİN PANELİ - ESKİ MODAL'I BUL VE ŞUNUNLA DEĞİŞTİR -->
+<div class="modal-overlay" id="adminModal" style="display:none" onclick="modalKapat('adminModal')">
+    <div class="admin-panel-tam" onclick="event.stopPropagation()">
+        <div class="admin-panel-sidebar">
+            <div class="admin-panel-logo">
+                <span class="admin-logo-ikon">⚡</span>
+                <span class="admin-logo-yazi">BOOM Admin</span>
+            </div>
+            <nav class="admin-nav">
+                <button class="admin-nav-item aktif" onclick="adminSekme('kullanicilar', this)" data-sekme="kullanicilar">
+                    <span class="admin-nav-ikon">👥</span>
+                    <span>Kullanıcılar</span>
+                </button>
+                <button class="admin-nav-item" onclick="adminSekme('online', this)" data-sekme="online">
+                    <span class="admin-nav-ikon">🟢</span>
+                    <span>Çevrimiçi</span>
+                </button>
+                <button class="admin-nav-item" onclick="adminSekme('banlar', this)" data-sekme="banlar">
+                    <span class="admin-nav-ikon">🚫</span>
+                    <span>Ban Listesi</span>
+                </button>
+                <button class="admin-nav-item" onclick="adminSekme('ipbanlar', this)" data-sekme="ipbanlar">
+                    <span class="admin-nav-ikon">🌐</span>
+                    <span>IP Ban</span>
+                </button>
+                <button class="admin-nav-item" onclick="adminSekme('botlar', this)" data-sekme="botlar">
+                    <span class="admin-nav-ikon">🤖</span>
+                    <span>Botlar</span>
+                </button>
+                <button class="admin-nav-item tehlikeli" onclick="adminSekme('reset', this)" data-sekme="reset">
+                    <span class="admin-nav-ikon">🔴</span>
+                    <span>Site Reset</span>
+                </button>
+            </nav>
+            <button class="admin-kapat-btn" onclick="modalKapat('adminModal')">✕ Kapat</button>
+        </div>
+        <div class="admin-panel-icerik" id="adminPanelIcerik">
+            <div class="admin-yukle">Yükleniyor...</div>
+        </div>
     </div>
+</div>
 
     <!-- BAN MODAL -->
     <div class="modal-overlay" id="banModal" style="display:none" onclick="modalKapat('banModal')">
