@@ -213,6 +213,7 @@ async function tablolariOlustur() {
         olusturma    INTEGER DEFAULT (strftime('%s','now'))
     )`);
 
+    
     // Kullanıcı IP kayıtları (hangi kullanıcı hangi IP'den bağlandı)
     await run(`CREATE TABLE IF NOT EXISTS kullanici_ip_kayitlari (
         id           INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -261,6 +262,33 @@ async function tablolariOlustur() {
     )`);
 
     await sosyalTabloOlustur();
+    await botHesaplariniOlustur();
+    // tablolariOlustur fonksiyonunun sonuna, sosyalTabloOlustur() çağrısından SONRA ekle:
+
+async function botHesaplariniOlustur() {
+    const bcrypt = require('bcryptjs');
+    const botlar = [
+        { ad: 'mavibot',    sifre: 'mavibot123' },
+        { ad: 'saribot',    sifre: 'saribot123' },
+        { ad: 'kirmizibot', sifre: 'kirmizibot123' },
+        { ad: 'yesilbot',   sifre: 'yesilbot123' },
+    ];
+
+    for (const bot of botlar) {
+        const mevcut = await get('SELECT id FROM kullanicilar WHERE kullanici_adi = ? COLLATE NOCASE', [bot.ad]);
+        if (!mevcut) {
+            const hash = bcrypt.hashSync(bot.sifre, 10);
+            await run(
+                `INSERT INTO kullanicilar (kullanici_adi, sifre_hash, rol) VALUES (?, ?, 'bot')`,
+                [bot.ad, hash]
+            );
+            console.log('✅ Bot oluşturuldu:', bot.ad);
+        } else {
+            // Rolü bot yap (varsa)
+            await run(`UPDATE kullanicilar SET rol = 'bot' WHERE kullanici_adi = ? AND rol != 'bot'`, [bot.ad]);
+        }
+    }
+}
 
     console.log('✅ Veritabanı hazır (v4 + IP Ban + Story + Reels)');
 }
