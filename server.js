@@ -828,6 +828,58 @@ app.delete('/api/gonderi/:gonderiId', async (req, res) => {
         res.status(500).json({ hata: 'Sunucu hatası' });
     }
 });
+// ==================== SİTE RESET ENDPOİNT ====================
+// Bu kodu server.js'de /api/gonderi DELETE endpointinin ALTINA ekle
+
+app.post('/api/admin/site-reset', async (req, res) => {
+    try {
+        const { token, secenekler } = req.body;
+        const decoded = jwt.verify(token, JWT_SECRET);
+        const kullanici = await db.kullaniciBul(decoded.id);
+        if (!kullanici || kullanici.rol !== 'admin') {
+            return res.json({ basarili: false, hata: 'Yetkisiz işlem' });
+        }
+
+        const sonuclar = [];
+
+        if (secenekler.mesajlar) {
+            await db.tumMesajlariSil();
+            sonuclar.push('Mesajlar');
+            // Tüm odalara temizlendi eventi gönder
+            io.emit('oda-temizlendi-genel');
+        }
+        if (secenekler.gonderiler) {
+            await db.tumGonderileriSil();
+            sonuclar.push('Gönderiler');
+        }
+        if (secenekler.reels) {
+            await db.tumReelsSil();
+            sonuclar.push('Reels');
+        }
+        if (secenekler.storiler) {
+            await db.tumStorileriSil();
+            sonuclar.push('Storiler');
+        }
+        if (secenekler.banlar) {
+            await db.tumBanlariSil();
+            sonuclar.push('Banlar');
+        }
+
+        res.json({ basarili: true, mesaj: sonuclar.join(', ') + ' silindi.' });
+    } catch (e) {
+        console.error('Reset hatası:', e);
+        res.json({ basarili: false, hata: 'Sunucu hatası: ' + e.message });
+    }
+});
+
+// server.js'deki socket.on('admin-sistem-bildirim') YOKSA şunu ekle:
+
+//
+// socket.on('admin-sistem-bildirim', ({ metin }) => {
+//     if (ben.rol !== 'admin') return;
+//     io.emit('sistem-bildirim', { metin });
+//     socket.emit('admin-islem-tamam', 'Bildirim gönderildi!');
+// });
 
 app.post('/api/yorum', async (req, res) => {
     try {
@@ -1770,6 +1822,11 @@ io.on('connection', async (socket) => {
         io.emit('kullanici-ayrildi-genel', ben.id);
         console.log('Ayrildi:', ben.ad);
     });
+
+    socket.on('admin-sistem-bildirim', ({ metin }) => {
+    if (ben.rol !== 'admin') return;
+    io.emit('sistem-bildirim', { metin });
+});
 });
 
 // ==================== PERİYODİK TEMİZLİK ====================
